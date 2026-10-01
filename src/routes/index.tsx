@@ -16,6 +16,19 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+const SKY_PREF_KEY = "weather:sky-pref";
+const SKY_OPTIONS = [
+  { value: "auto", label: "Auto (weather)" },
+  { value: "clear-day", label: "Sunny day" },
+  { value: "clear-night", label: "Clear night" },
+  { value: "cloudy-day", label: "Cloudy day" },
+  { value: "cloudy-night", label: "Cloudy night" },
+  { value: "fog", label: "Fog" },
+  { value: "rain", label: "Rain" },
+  { value: "snow", label: "Snow" },
+  { value: "storm", label: "Storm" },
+];
+
 function Index() {
   const [weather, setWeather] = useState<Weather | null>(null);
   const [offline, setOffline] = useState(false);
@@ -24,6 +37,7 @@ function Index() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Place[]>([]);
   const [showLocDialog, setShowLocDialog] = useState(false);
+  const [skyChoice, setSkyChoice] = useState("auto");
 
   async function load(place: Place) {
     setLoading(true);
@@ -38,6 +52,13 @@ function Index() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SKY_PREF_KEY);
+      if (saved && SKY_OPTIONS.some((o) => o.value === saved)) setSkyChoice(saved);
+    } catch {}
+  }, []);
 
   useEffect(() => {
     const cached = loadCached();
@@ -79,16 +100,41 @@ function Index() {
     );
   }
 
-  const sky = weather ? skyKey(weather.current.code, weather.current.is_day) : "default";
+  function onSkyChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const v = e.target.value;
+    setSkyChoice(v);
+    try {
+      if (v === "auto") localStorage.removeItem(SKY_PREF_KEY);
+      else localStorage.setItem(SKY_PREF_KEY, v);
+    } catch {}
+  }
+
+  const autoSky = weather ? skyKey(weather.current.code, weather.current.is_day) : "default";
+  const sky = skyChoice === "auto" ? autoSky : skyChoice;
 
   return (
     <div className={`sky sky-${sky} min-h-screen text-foreground`}>
       <main className="mx-auto max-w-2xl px-4 py-8">
-        <header className="mb-6 flex items-center justify-between">
+        <header className="mb-6 flex items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight">My Weather Pal</h1>
-          <Link to="/privacy" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-            Privacy
-          </Link>
+          <div className="flex items-center gap-3">
+            <select
+              value={skyChoice}
+              onChange={onSkyChange}
+              aria-label="Background color"
+              title="Background color"
+              className="rounded-lg border border-input bg-card px-2 py-1 text-sm text-card-foreground outline-none focus:ring-2 focus:ring-ring"
+            >
+              {SKY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <Link to="/privacy" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
+              Privacy
+            </Link>
+          </div>
         </header>
 
         <form onSubmit={onSearch} className="flex gap-2">
