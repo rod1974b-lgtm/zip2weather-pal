@@ -5,9 +5,9 @@ import { describe, fetchWeather, loadCached, searchCity, skyKey, type Place, typ
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Skyline — Simple Weather" },
+      { title: "My Weather Pal" },
       { name: "description", content: "Current temperature, hourly and 7-day forecast. No tracking, works offline." },
-      { property: "og:title", content: "Skyline — Simple Weather" },
+      { property: "og:title", content: "My Weather Pal" },
       { property: "og:description", content: "Current temperature, hourly and 7-day forecast. No tracking, works offline." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -85,7 +85,7 @@ function Index() {
     <div className={`sky sky-${sky} min-h-screen text-foreground`}>
       <main className="mx-auto max-w-2xl px-4 py-8">
         <header className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">Skyline</h1>
+          <h1 className="text-2xl font-bold tracking-tight">My Weather Pal</h1>
           <Link to="/privacy" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
             Privacy
           </Link>
