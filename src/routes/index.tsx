@@ -9,6 +9,8 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "Current temperature, hourly and 7-day forecast. No tracking, works offline." },
       { property: "og:title", content: "Skyline — Simple Weather" },
       { property: "og:description", content: "Current temperature, hourly and 7-day forecast. No tracking, works offline." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Index,
@@ -95,7 +97,7 @@ function Index() {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search a city…"
             aria-label="Search a city"
-            className="flex-1 rounded-lg border border-input bg-card px-3 py-2 text-card-foreground outline-none focus:ring-2 focus:ring-ring"
+            className="min-w-0 flex-1 rounded-lg border border-input bg-card px-3 py-2 text-card-foreground outline-none focus:ring-2 focus:ring-ring"
           />
           <button className="rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground">Search</button>
           <button

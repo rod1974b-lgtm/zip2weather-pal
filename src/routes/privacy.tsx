@@ -7,6 +7,8 @@ export const Route = createFileRoute("/privacy")({
       { name: "description", content: "How Skyline handles your data: no accounts, no trackers, no analytics." },
       { property: "og:title", content: "Privacy — Skyline Weather" },
       { property: "og:description", content: "How Skyline handles your data: no accounts, no trackers, no analytics." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Privacy,
