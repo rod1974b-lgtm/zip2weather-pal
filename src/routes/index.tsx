@@ -5,9 +5,9 @@ import { describe, fetchWeather, loadCached, searchCity, skyKey, type Place, typ
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Skyline — Simple Weather" },
+      { title: "My Weather Pal" },
       { name: "description", content: "Current temperature, hourly and 7-day forecast. No tracking, works offline." },
-      { property: "og:title", content: "Skyline — Simple Weather" },
+      { property: "og:title", content: "My Weather Pal" },
       { property: "og:description", content: "Current temperature, hourly and 7-day forecast. No tracking, works offline." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
