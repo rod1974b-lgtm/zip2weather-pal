@@ -3,10 +3,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy — Skyline Weather" },
-      { name: "description", content: "How Skyline handles your data: no accounts, no trackers, no analytics." },
-      { property: "og:title", content: "Privacy — Skyline Weather" },
-      { property: "og:description", content: "How Skyline handles your data: no accounts, no trackers, no analytics." },
+      { title: "Privacy — My Weather Pal" },
+      { name: "description", content: "How My Weather Pal handles your data: no accounts, no trackers, no analytics." },
+      { property: "og:title", content: "Privacy — My Weather Pal" },
+      { property: "og:description", content: "How My Weather Pal handles your data: no accounts, no trackers, no analytics." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -20,7 +20,7 @@ function Privacy() {
       <Link to="/" className="text-sm text-muted-foreground hover:underline">← Back to weather</Link>
       <h1 className="mt-4 text-3xl font-bold">Privacy</h1>
       <div className="mt-6 space-y-4 leading-relaxed">
-        <p>Skyline has no accounts, no analytics, no ads and no trackers. There are no cookies.</p>
+        <p>My Weather Pal has no accounts, no analytics, no ads and no trackers. There are no cookies.</p>
         <h2 className="text-xl font-semibold">What is sent</h2>
         <p>
           City searches and coordinates are sent directly from your browser to{" "}

@@ -85,7 +85,7 @@ function Index() {
     <div className={`sky sky-${sky} min-h-screen text-foreground`}>
       <main className="mx-auto max-w-2xl px-4 py-8">
         <header className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">Skyline</h1>
+          <h1 className="text-2xl font-bold tracking-tight">My Weather Pal</h1>
           <Link to="/privacy" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
             Privacy
           </Link>
