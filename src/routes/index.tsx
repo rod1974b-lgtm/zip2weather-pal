@@ -16,6 +16,19 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+const SKY_PREF_KEY = "weather:sky-pref";
+const SKY_OPTIONS = [
+  { value: "auto", label: "Auto (weather)" },
+  { value: "clear-day", label: "Sunny day" },
+  { value: "clear-night", label: "Clear night" },
+  { value: "cloudy-day", label: "Cloudy day" },
+  { value: "cloudy-night", label: "Cloudy night" },
+  { value: "fog", label: "Fog" },
+  { value: "rain", label: "Rain" },
+  { value: "snow", label: "Snow" },
+  { value: "storm", label: "Storm" },
+];
+
 function Index() {
   const [weather, setWeather] = useState<Weather | null>(null);
   const [offline, setOffline] = useState(false);
@@ -24,6 +37,7 @@ function Index() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Place[]>([]);
   const [showLocDialog, setShowLocDialog] = useState(false);
+  const [skyChoice, setSkyChoice] = useState("auto");
 
   async function load(place: Place) {
     setLoading(true);
@@ -38,6 +52,13 @@ function Index() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SKY_PREF_KEY);
+      if (saved && SKY_OPTIONS.some((o) => o.value === saved)) setSkyChoice(saved);
+    } catch {}
+  }, []);
 
   useEffect(() => {
     const cached = loadCached();
