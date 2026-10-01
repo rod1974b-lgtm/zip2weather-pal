@@ -1,0 +1,16 @@
+{
+  "source": "code archive",
+  "capabilities": [
+    {"capability":"application code","source":"uploaded ZIP","outcome":"replace starter with imported TanStack Start app","status":"migrate","next_action":"copy and verify"},
+    {"capability":"routes","source":"home and privacy pages","outcome":"preserve both routes","status":"migrate","next_action":"verify in preview"},
+    {"capability":"weather data","source":"Open-Meteo browser API calls","outcome":"preserve external provider","status":"migrate","next_action":"verify city search and forecast"},
+    {"capability":"offline support","source":"browser cache and generated service worker","outcome":"preserve offline caching for published app","status":"migrate","next_action":"verify configuration and preview guard"},
+    {"capability":"database and records","source":"none detected","outcome":"not applicable","status":"verified","next_action":"none"},
+    {"capability":"authentication and authorization","source":"none detected","outcome":"not applicable","status":"verified","next_action":"none"},
+    {"capability":"uploaded file bytes","source":"favicon in ZIP","outcome":"preserve supplied favicon","status":"migrate","next_action":"verify served asset"},
+    {"capability":"secrets","source":"none detected","outcome":"not applicable","status":"verified","next_action":"none"},
+    {"capability":"public endpoints, callbacks, webhooks, and schedules","source":"none detected","outcome":"not applicable","status":"verified","next_action":"none"},
+    {"capability":"cutover","source":"Lovable project identity","outcome":"preserve existing project connection metadata","status":"migrate","next_action":"retain local identity file"},
+    {"capability":"verification","source":"preview","outcome":"test routes and representative weather lookup","status":"pending","next_action":"run after import"}
+  ]
+}
