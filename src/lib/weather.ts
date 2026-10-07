@@ -37,6 +37,7 @@ export type Weather = {
 
 const CACHE_KEY = "weather:last";
 const UNIT_KEY = "weather:unit-pref";
+const FAVORITES_KEY = "weather:favorites";
 
 export function loadUnitPref(): WeatherUnit {
   try {
@@ -51,6 +52,32 @@ export function saveUnitPref(unit: WeatherUnit): void {
   try {
     localStorage.setItem(UNIT_KEY, unit);
   } catch {}
+}
+
+export function loadFavorites(): Place[] {
+  try {
+    const raw = localStorage.getItem(FAVORITES_KEY);
+    return raw ? (JSON.parse(raw) as Place[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveFavorites(favorites: Place[]): void {
+  try {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  } catch {}
+}
+
+export function isSamePlace(a: Place, b: Place): boolean {
+  return (
+    (Math.abs(a.lat - b.lat) < 0.01 && Math.abs(a.lon - b.lon) < 0.01) ||
+    a.name === b.name
+  );
+}
+
+export function isFavorite(place: Place, favorites: Place[]): boolean {
+  return favorites.some((f) => isSamePlace(f, place));
 }
 
 export function loadCached(): Weather | null {
