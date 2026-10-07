@@ -3,8 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import {
   describe,
   fetchWeather,
+  isFavorite,
+  isSamePlace,
   loadCached,
+  loadFavorites,
   loadUnitPref,
+  saveFavorites,
   saveUnitPref,
   searchCity,
   skyKey,
@@ -54,6 +58,7 @@ function formatTimeAgo(timestamp: number): string {
 function Index() {
   const [weather, setWeather] = useState<Weather | null>(null);
   const [unit, setUnit] = useState<WeatherUnit>("metric");
+  const [favorites, setFavorites] = useState<Place[]>([]);
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -93,6 +98,8 @@ function Index() {
 
     const savedUnit = loadUnitPref();
     setUnit(savedUnit);
+
+    setFavorites(loadFavorites());
 
     const cached = loadCached();
     if (cached) {
@@ -148,6 +155,26 @@ function Index() {
     if (weather) {
       load(weather.place, nextUnit);
     }
+  }
+
+  function toggleFavorite(place: Place) {
+    setFavorites((prev) => {
+      const exists = isFavorite(place, prev);
+      const next = exists
+        ? prev.filter((p) => !isSamePlace(p, place))
+        : [...prev, place];
+      saveFavorites(next);
+      return next;
+    });
+  }
+
+  function removeFavorite(place: Place, e: React.MouseEvent) {
+    e.stopPropagation();
+    setFavorites((prev) => {
+      const next = prev.filter((p) => !isSamePlace(p, place));
+      saveFavorites(next);
+      return next;
+    });
   }
 
   async function onSearchSubmit(e: React.FormEvent) {
@@ -283,6 +310,35 @@ function Index() {
           )}
         </form>
 
+        {/* Favorite Cities Quick-Access Chips */}
+        {favorites.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground mr-1">Favorites:</span>
+            {favorites.map((fav) => (
+              <span
+                key={`${fav.lat},${fav.lon}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs text-card-foreground shadow-sm hover:bg-accent cursor-pointer transition-colors"
+                onClick={() => {
+                  setQ("");
+                  setResults([]);
+                  load(fav);
+                }}
+              >
+                <span>{fav.name.split(",")[0]}</span>
+                <button
+                  type="button"
+                  onClick={(e) => removeFavorite(fav, e)}
+                  className="text-muted-foreground hover:text-foreground text-sm font-semibold leading-none"
+                  title="Remove from favorites"
+                  aria-label={`Remove ${fav.name} from favorites`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
         {offline && weather && (
           <p className="mt-4 rounded-lg bg-muted px-3 py-2 text-sm text-card-foreground">
             Offline — showing weather saved {new Date(weather.fetchedAt).toLocaleString()}.
@@ -299,6 +355,8 @@ function Index() {
           <WeatherView
             w={weather}
             refreshing={refreshing}
+            isFav={isFavorite(weather.place, favorites)}
+            onToggleFav={() => toggleFavorite(weather.place)}
             onRefresh={() => load(weather.place, unit, true)}
           />
         )}
@@ -330,14 +388,17 @@ function Index() {
 function WeatherView({
   w,
   refreshing,
+  isFav,
+  onToggleFav,
   onRefresh,
 }: {
   w: Weather;
   refreshing: boolean;
+  isFav: boolean;
+  onToggleFav: () => void;
   onRefresh: () => void;
 }) {
   const d = describe(w.current.code);
-  const tempSymbol = w.unit === "imperial" ? "°F" : "°C";
   const windUnit = w.unit === "imperial" ? "mph" : "km/h";
   const precipUnit = w.unit === "imperial" ? "in" : "mm";
 
@@ -347,10 +408,21 @@ function WeatherView({
       <section className="mt-6 rounded-2xl bg-card p-6 text-card-foreground shadow-sm">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="text-sm font-medium text-muted-foreground">
-              {w.place.name}
-              {w.place.country ? `, ${w.place.country}` : ""}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-muted-foreground">
+                {w.place.name}
+                {w.place.country ? `, ${w.place.country}` : ""}
+              </p>
+              <button
+                type="button"
+                onClick={onToggleFav}
+                className="text-base text-yellow-500 hover:scale-110 transition-transform"
+                title={isFav ? "Remove from favorites" : "Save to favorites"}
+                aria-label={isFav ? "Remove from favorites" : "Save to favorites"}
+              >
+                {isFav ? "★" : "☆"}
+              </button>
+            </div>
             <div className="mt-2 flex items-center gap-4">
               <span className="text-6xl" role="img" aria-label={d.label}>
                 {d.icon}
