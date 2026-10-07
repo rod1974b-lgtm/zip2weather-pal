@@ -222,25 +222,31 @@ function Index() {
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight">My Weather Pal</h1>
           <div className="flex items-center gap-2">
-            {/* Unit toggle */}
+            {/* US / Metric Unit Toggle Button */}
             <div className="flex items-center rounded-lg border border-input bg-card p-0.5 text-xs text-card-foreground">
               <button
                 type="button"
-                onClick={() => toggleUnit("metric")}
-                className={`rounded-md px-2 py-1 font-medium transition-colors ${
-                  unit === "metric" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                onClick={() => toggleUnit("imperial")}
+                className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
+                  unit === "imperial"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
+                title="Switch to US Imperial (°F, mph, in)"
               >
-                °C
+                US (°F)
               </button>
               <button
                 type="button"
-                onClick={() => toggleUnit("imperial")}
-                className={`rounded-md px-2 py-1 font-medium transition-colors ${
-                  unit === "imperial" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                onClick={() => toggleUnit("metric")}
+                className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
+                  unit === "metric"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
+                title="Switch to Metric (°C, km/h, mm)"
               >
-                °F
+                Metric (°C)
               </button>
             </div>
 
@@ -401,6 +407,7 @@ function WeatherView({
   const d = describe(w.current.code);
   const windUnit = w.unit === "imperial" ? "mph" : "km/h";
   const precipUnit = w.unit === "imperial" ? "in" : "mm";
+  const tempSymbol = w.unit === "imperial" ? "°F" : "°C";
 
   return (
     <>
@@ -428,11 +435,16 @@ function WeatherView({
                 {d.icon}
               </span>
               <div>
-                <p className="text-6xl font-bold tracking-tight">
-                  {Math.round(w.current.temp)}°
-                </p>
+                <div className="flex items-baseline gap-1">
+                  <p className="text-6xl font-bold tracking-tight">
+                    {Math.round(w.current.temp)}
+                  </p>
+                  <span className="text-2xl font-semibold text-muted-foreground">
+                    {tempSymbol}
+                  </span>
+                </div>
                 <p className="text-sm text-muted-foreground">
-                  {d.label} · Feels like {Math.round(w.current.feels)}°
+                  {d.label} · Feels like {Math.round(w.current.feels)}{tempSymbol}
                 </p>
               </div>
             </div>
