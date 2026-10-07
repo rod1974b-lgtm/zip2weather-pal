@@ -14,7 +14,7 @@ export type Weather = {
     humidity: number;
     uvIndex: number;
     precipitation: number;
-    aqi?: number;
+    aqi?: number | undefined;
     is_day?: number;
   };
   sun: {
