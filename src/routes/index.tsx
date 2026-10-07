@@ -48,6 +48,13 @@ const SKY_OPTIONS = [
   { value: "storm", label: "Storm" },
 ];
 
+const FONT_SIZE_KEY = "weather:font-size-pref";
+const FONT_SIZE_OPTIONS = [
+  { value: "normal", label: "Text: Normal (100%)", scale: "100%" },
+  { value: "large", label: "Text: Large (115%)", scale: "115%" },
+  { value: "xlarge", label: "Text: Huge (130%)", scale: "130%" },
+];
+
 export interface TickerAlertItem {
   icon: string;
   tag: string;
@@ -120,13 +127,62 @@ async function fetchNearbyEarthquakes(lat: number, lon: number): Promise<TickerA
   }
 }
 
-function evaluateAllDisastersAndAlerts(w: Weather, seismicItems: TickerAlertItem[] = []): TickerAlertItem[] {
-  const items: TickerAlertItem[] = [...seismicItems];
+async function fetchLiveOfficialAlerts(lat: number, lon: number): Promise<TickerAlertItem[]> {
+  try {
+    const res = await fetch(`https://api.weather.gov/alerts/active?point=${lat},${lon}`, {
+      headers: { "User-Agent": "MyWeatherPal/1.0 (contact@weatherpal.local)" },
+      signal: AbortSignal.timeout(3500),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const items: TickerAlertItem[] = [];
+
+    for (const f of data.features || []) {
+      const eventName = f.properties?.event || "Weather Bulletin";
+      const headline = f.properties?.headline || f.properties?.description || "";
+      const lower = (eventName + " " + headline).toLowerCase();
+
+      let icon = "⚠️";
+      let severity: TickerAlertItem["severity"] = "warning";
+
+      if (lower.includes("flood")) {
+        icon = "🌊";
+        severity = lower.includes("warning") ? "disaster" : "warning";
+      } else if (lower.includes("heavy rain") || lower.includes("downpour")) {
+        icon = "🌧️";
+        severity = "warning";
+      } else if (lower.includes("tornado") || lower.includes("hurricane")) {
+        icon = "🌪️";
+        severity = "disaster";
+      }
+
+      items.push({
+        icon,
+        tag: eventName.toUpperCase(),
+        text: headline.slice(0, 160) || `Active official bulletin: ${eventName}.`,
+        severity,
+      });
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
+function evaluateAllDisastersAndAlerts(
+  w: Weather,
+  seismicAndOfficialItems: TickerAlertItem[] = []
+): TickerAlertItem[] {
+  const items: TickerAlertItem[] = [...seismicAndOfficialItems];
   const windMph = w.unit === "imperial" ? w.current.wind : w.current.wind * 0.621371;
   const tempC = w.unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
   const feelsC = w.unit === "imperial" ? ((w.current.feels - 32) * 5) / 9 : w.current.feels;
   const windUnit = w.unit === "imperial" ? "mph" : "km/h";
   const tempUnit = w.unit === "imperial" ? "°F" : "°C";
+
+  // Check if live official feed already reported floods/heavy rains
+  const hasLiveFlood = items.some((i) => /flood/i.test(i.tag) || /flood/i.test(i.text));
+  const hasLiveRain = items.some((i) => /rain/i.test(i.tag) || /rain/i.test(i.text));
 
   // 1. TORNADO & VIOLENT HAIL DISASTERS (WMO 96, 99)
   if (w.current.code === 99) {
@@ -176,23 +232,47 @@ function evaluateAllDisastersAndAlerts(w: Weather, seismicItems: TickerAlertItem
     });
   }
 
-  // 3. FLASH FLOOD & TORRENTIAL RAIN DISASTER
+  // 3. FLASH FLOOD, RIVER BASIN FLOOD WATCH & HEAVY RAIN
   const isHeavyRainCode = w.current.code === 65 || w.current.code === 82;
+  const isModerateRainCode = w.current.code === 63 || w.current.code === 81;
   const precipMm = w.unit === "imperial" ? w.current.precipitation * 25.4 : w.current.precipitation;
-  if (precipMm >= 15 || (isHeavyRainCode && precipMm >= 8)) {
-    items.push({
-      icon: "🌊",
-      tag: "FLASH FLOOD EMERGENCY",
-      text: "Dangerous torrential rainfall and rapid street flooding underway. Never attempt to drive through flooded roads.",
-      severity: "disaster",
-    });
-  } else if (isHeavyRainCode || w.current.code === 63 || w.current.code === 81) {
-    items.push({
-      icon: "🌧️",
-      tag: "HEAVY RAIN FLOOD ADVISORY",
-      text: "Saturated ground and localized street flooding risk. Exercise extreme road caution.",
-      severity: "caution",
-    });
+  const maxDailyProb = Math.max(...(w.daily.map((d) => d.precipProbMax || 0)));
+  const heavyRainDays = w.daily.filter((d) => [65, 82].includes(d.code)).length;
+
+  if (!hasLiveFlood) {
+    if (precipMm >= 15 || (isHeavyRainCode && precipMm >= 8)) {
+      items.push({
+        icon: "🌊",
+        tag: "FLASH FLOOD EMERGENCY",
+        text: "Dangerous torrential rainfall and rapid street flooding underway. Never attempt to drive through flooded roads.",
+        severity: "disaster",
+      });
+    } else if (heavyRainDays >= 1 || (precipMm >= 5 && maxDailyProb >= 70) || isHeavyRainCode) {
+      items.push({
+        icon: "🌊",
+        tag: "RIVER BASIN FLOOD WATCH",
+        text: "Sustained high rainfall runoff threatens river basins and low-lying watercourses. Monitor local waterways.",
+        severity: "warning",
+      });
+    }
+  }
+
+  if (!hasLiveRain) {
+    if (isHeavyRainCode || precipMm >= 8) {
+      items.push({
+        icon: "🌧️",
+        tag: "HEAVY TO VERY HEAVY RAINS",
+        text: "Intense downpours and low road visibility reported. Significant pooling and travel delays expected.",
+        severity: "warning",
+      });
+    } else if (isModerateRainCode || (precipMm >= 2.5 && precipMm < 8)) {
+      items.push({
+        icon: "🌧️",
+        tag: "HEAVY RAIN ADVISORY",
+        text: "Saturated ground and localized street drainage pooling risk. Exercise road caution.",
+        severity: "caution",
+      });
+    }
   }
 
   // 4. BLIZZARD, ICE STORM & WINTER DISASTERS
@@ -294,7 +374,7 @@ function evaluateAllDisastersAndAlerts(w: Weather, seismicItems: TickerAlertItem
 
   // 9. UPCOMING PRECIPITATION ADVISORY
   const nextRain = w.hourly.slice(0, 5).find((h) => h.precipProb >= 60);
-  if (nextRain && !isHeavyRainCode && w.current.code < 51) {
+  if (nextRain && !isHeavyRainCode && w.current.code < 51 && !hasLiveRain) {
     items.push({
       icon: "💧",
       tag: "RAIN ONSET ADVISORY",
@@ -332,6 +412,7 @@ function Index() {
   const [showInstallDialog, setShowInstallDialog] = useState(false);
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
   const [skyChoice, setSkyChoice] = useState("auto");
+  const [fontSizeChoice, setFontSizeChoice] = useState("normal");
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function load(place: Place, targetUnit: WeatherUnit = unit, isRefresh = false) {
@@ -339,10 +420,15 @@ function Index() {
     else setLoading(true);
     setError(null);
 
-    // Fetch live earthquake/seismic disaster feeds asynchronously
-    fetchNearbyEarthquakes(place.lat, place.lon)
-      .then((items) => setNearbyDisasters(items))
-      .catch(() => setNearbyDisasters([]));
+    // Fetch live earthquake/seismic & live official bulletins in parallel
+    Promise.allSettled([
+      fetchNearbyEarthquakes(place.lat, place.lon),
+      fetchLiveOfficialAlerts(place.lat, place.lon),
+    ]).then(([eqRes, offRes]) => {
+      const eqItems = eqRes.status === "fulfilled" ? eqRes.value : [];
+      const offItems = offRes.status === "fulfilled" ? offRes.value : [];
+      setNearbyDisasters([...offItems, ...eqItems]);
+    });
 
     try {
       const data = await fetchWeather(place, targetUnit);
@@ -362,6 +448,15 @@ function Index() {
       const savedSky = localStorage.getItem(SKY_PREF_KEY);
       if (savedSky && SKY_OPTIONS.some((o) => o.value === savedSky)) {
         setSkyChoice(savedSky);
+      }
+    } catch {}
+
+    try {
+      const savedFontSize = localStorage.getItem(FONT_SIZE_KEY);
+      if (savedFontSize && FONT_SIZE_OPTIONS.some((o) => o.value === savedFontSize)) {
+        setFontSizeChoice(savedFontSize);
+        const opt = FONT_SIZE_OPTIONS.find((o) => o.value === savedFontSize);
+        if (opt) document.documentElement.style.fontSize = opt.scale;
       }
     } catch {}
 
@@ -395,6 +490,7 @@ function Index() {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
       window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+      document.documentElement.style.fontSize = "";
     };
   }, []);
 
@@ -500,6 +596,19 @@ function Index() {
     } catch {}
   }
 
+  function onFontSizeChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const v = e.target.value;
+    setFontSizeChoice(v);
+    const opt = FONT_SIZE_OPTIONS.find((o) => o.value === v);
+    if (opt) {
+      document.documentElement.style.fontSize = opt.scale;
+    }
+    try {
+      if (v === "normal") localStorage.removeItem(FONT_SIZE_KEY);
+      else localStorage.setItem(FONT_SIZE_KEY, v);
+    } catch {}
+  }
+
   const autoSky = weather ? skyKey(weather.current.code, weather.current.is_day) : "default";
   const sky = skyChoice === "auto" ? autoSky : skyChoice;
 
@@ -546,6 +655,21 @@ function Index() {
             >
               📲 Install App
             </button>
+
+            {/* Text Size Selector */}
+            <select
+              value={fontSizeChoice}
+              onChange={onFontSizeChange}
+              aria-label="Text size"
+              title="Adjust text size"
+              className="rounded-lg border border-input bg-card px-2 py-1 text-sm text-card-foreground outline-none focus:ring-2 focus:ring-ring"
+            >
+              {FONT_SIZE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
 
             {/* Sky theme selector */}
             <select
@@ -989,7 +1113,7 @@ function WeatherView({
       </section>
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        Data by <a className="underline hover:text-foreground" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a> & <a className="underline hover:text-foreground" href="https://earthquake.usgs.gov/" target="_blank" rel="noopener noreferrer">USGS</a>
+        Data by <a className="underline hover:text-foreground" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a>, <a className="underline hover:text-foreground" href="https://earthquake.usgs.gov/" target="_blank" rel="noopener noreferrer">USGS</a> & <a className="underline hover:text-foreground" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">NWS</a>
       </p>
 
       {/* Self-contained continuous ticker animation styles */}
