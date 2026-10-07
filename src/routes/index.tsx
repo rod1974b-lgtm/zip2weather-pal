@@ -1,8 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
+  aqiCategory,
   describe,
   fetchWeather,
+  getClothingAdvice,
+  getWeatherAlert,
   isFavorite,
   isSamePlace,
   loadCached,
@@ -67,6 +70,8 @@ function Index() {
   const [results, setResults] = useState<Place[]>([]);
   const [searching, setSearching] = useState(false);
   const [showLocDialog, setShowLocDialog] = useState(false);
+  const [showInstallDialog, setShowInstallDialog] = useState(false);
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
   const [skyChoice, setSkyChoice] = useState("auto");
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -87,7 +92,6 @@ function Index() {
     }
   }
 
-  // Load preferences from local storage on mount
   useEffect(() => {
     try {
       const savedSky = localStorage.getItem(SKY_PREF_KEY);
@@ -115,13 +119,20 @@ function Index() {
     const onOffline = () => setOffline(true);
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
+
+    const handleBeforeInstall = (e: any) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+
     return () => {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
     };
   }, []);
 
-  // Debounced search suggestions
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     const trimmed = q.trim();
@@ -137,7 +148,6 @@ function Index() {
         const r = await searchCity(trimmed);
         setResults(r);
       } catch {
-        // Soft fail on autocomplete
       } finally {
         setSearching(false);
       }
@@ -175,6 +185,18 @@ function Index() {
       saveFavorites(next);
       return next;
     });
+  }
+
+  async function handleInstallClick() {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      if (choice.outcome === "accepted") {
+        setDeferredInstallPrompt(null);
+      }
+    } else {
+      setShowInstallDialog(true);
+    }
   }
 
   async function onSearchSubmit(e: React.FormEvent) {
@@ -221,7 +243,7 @@ function Index() {
       <main className="mx-auto max-w-2xl px-4 py-8">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight">My Weather Pal</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* US / Metric Unit Toggle Button */}
             <div className="flex items-center rounded-lg border border-input bg-card p-0.5 text-xs text-card-foreground">
               <button
@@ -249,6 +271,16 @@ function Index() {
                 Metric (°C)
               </button>
             </div>
+
+            {/* Install App Button */}
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              className="rounded-lg border border-input bg-card px-2.5 py-1 text-xs font-medium text-card-foreground hover:bg-accent transition-colors"
+              title="Install My Weather Pal to your home screen"
+            >
+              📲 Install App
+            </button>
 
             {/* Sky theme selector */}
             <select
@@ -350,7 +382,7 @@ function Index() {
             )}
           </div>
 
-          {/* Save / Saved Button for the currently viewed city */}
+          {/* Save / Saved Button */}
           {weather && (
             <button
               type="button"
@@ -394,6 +426,7 @@ function Index() {
         )}
       </main>
 
+      {/* Location Permission Dialog */}
       {showLocDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 px-4" role="dialog" aria-modal="true">
           <div className="max-w-sm rounded-xl bg-card p-6 text-card-foreground shadow-lg">
@@ -408,6 +441,25 @@ function Index() {
               </button>
               <button onClick={useLocation} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">
                 Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Install Instructions Dialog */}
+      {showInstallDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 px-4" role="dialog" aria-modal="true">
+          <div className="max-w-sm rounded-xl bg-card p-6 text-card-foreground shadow-lg">
+            <h2 className="text-lg font-semibold">Install My Weather Pal</h2>
+            <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+              <p><strong>On iPhone / iPad (Safari):</strong> Tap the <strong>Share</strong> button (⎙), then select <strong>Add to Home Screen</strong>.</p>
+              <p><strong>On Android (Chrome):</strong> Tap the three-dot menu (⋮) in the top-right, then select <strong>Install App</strong> or <strong>Add to Home Screen</strong>.</p>
+              <p><strong>On PC / Mac:</strong> Look for the install icon in your browser address bar.</p>
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button onClick={() => setShowInstallDialog(false)} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">
+                Got it
               </button>
             </div>
           </div>
@@ -435,10 +487,28 @@ function WeatherView({
   const precipUnit = w.unit === "imperial" ? "in" : "mm";
   const tempSymbol = w.unit === "imperial" ? "°F" : "°C";
 
+  const alert = getWeatherAlert(w);
+  const advice = getClothingAdvice(w);
+  const aqiInfo = w.current.aqi !== undefined ? aqiCategory(w.current.aqi) : null;
+
   return (
     <>
+      {/* Weather Alert Banner */}
+      {alert && (
+        <div
+          className={`mt-4 flex items-center gap-2.5 rounded-xl border p-3 text-sm shadow-xs ${
+            alert.severity === "warning"
+              ? "border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-300"
+              : "border-blue-500/40 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+          }`}
+        >
+          <span className="text-lg">{alert.icon}</span>
+          <span className="font-medium">{alert.message}</span>
+        </div>
+      )}
+
       {/* Current conditions card */}
-      <section className="mt-6 rounded-2xl bg-card p-6 text-card-foreground shadow-sm">
+      <section className="mt-4 rounded-2xl bg-card p-6 text-card-foreground shadow-sm">
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="flex items-center gap-2">
@@ -490,28 +560,47 @@ function WeatherView({
           </button>
         </div>
 
-        {/* Current Metrics Grid */}
-        <div className="mt-6 grid grid-cols-2 gap-3 border-t border-border pt-4 sm:grid-cols-4">
-          <div className="rounded-lg bg-muted/40 p-2.5 text-center">
+        {/* What to Wear / Advice Tip */}
+        <div className="mt-4 rounded-lg bg-muted/40 p-3 text-xs leading-relaxed text-card-foreground">
+          <span className="font-semibold text-muted-foreground mr-1.5">What to wear:</span>
+          {advice}
+        </div>
+
+        {/* Current Metrics Grid (5 metrics) */}
+        <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-border pt-4 sm:grid-cols-5">
+          <div className="rounded-lg bg-muted/30 p-2.5 text-center">
             <span className="text-xs text-muted-foreground">Humidity</span>
-            <p className="text-lg font-semibold">{w.current.humidity}%</p>
+            <p className="text-base font-semibold">{w.current.humidity}%</p>
           </div>
-          <div className="rounded-lg bg-muted/40 p-2.5 text-center">
+          <div className="rounded-lg bg-muted/30 p-2.5 text-center">
             <span className="text-xs text-muted-foreground">Wind</span>
-            <p className="text-lg font-semibold">
+            <p className="text-base font-semibold">
               {Math.round(w.current.wind)} <span className="text-xs font-normal text-muted-foreground">{windUnit}</span>
             </p>
           </div>
-          <div className="rounded-lg bg-muted/40 p-2.5 text-center">
+          <div className="rounded-lg bg-muted/30 p-2.5 text-center">
             <span className="text-xs text-muted-foreground">UV Index</span>
-            <p className="text-lg font-semibold">
+            <p className="text-base font-semibold">
               {w.current.uvIndex}{" "}
-              <span className="text-xs font-normal text-muted-foreground">({uvCategory(w.current.uvIndex)})</span>
+              <span className="text-[11px] font-normal text-muted-foreground">({uvCategory(w.current.uvIndex)})</span>
             </p>
           </div>
-          <div className="rounded-lg bg-muted/40 p-2.5 text-center">
+          <div className="rounded-lg bg-muted/30 p-2.5 text-center">
+            <span className="text-xs text-muted-foreground">Air Quality</span>
+            <p className="text-base font-semibold">
+              {w.current.aqi !== undefined ? (
+                <>
+                  {w.current.aqi}{" "}
+                  <span className={`text-[11px] font-medium ${aqiInfo?.color}`}>({aqiInfo?.label})</span>
+                </>
+              ) : (
+                <span className="text-xs text-muted-foreground">--</span>
+              )}
+            </p>
+          </div>
+          <div className="rounded-lg bg-muted/30 p-2.5 text-center col-span-2 sm:col-span-1">
             <span className="text-xs text-muted-foreground">Precipitation</span>
-            <p className="text-lg font-semibold">
+            <p className="text-base font-semibold">
               {w.current.precipitation} <span className="text-xs font-normal text-muted-foreground">{precipUnit}</span>
             </p>
           </div>
@@ -526,7 +615,7 @@ function WeatherView({
         )}
       </section>
 
-      {/* Hourly forecast with precipitation indicators */}
+      {/* Hourly forecast */}
       <section className="mt-6">
         <h2 className="mb-2 font-semibold">Today</h2>
         <div className="flex gap-2 overflow-x-auto pb-2">
