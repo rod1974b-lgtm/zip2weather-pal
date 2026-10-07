@@ -270,6 +270,7 @@ function Index() {
           </div>
         </header>
 
+        {/* Search Field */}
         <form onSubmit={onSearchSubmit} className="relative flex gap-2">
           <div className="relative min-w-0 flex-1">
             <input
@@ -316,34 +317,59 @@ function Index() {
           )}
         </form>
 
-        {/* Favorite Cities Quick-Access Chips */}
-        {favorites.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-muted-foreground mr-1">Favorites:</span>
-            {favorites.map((fav) => (
-              <span
-                key={`${fav.lat},${fav.lon}`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs text-card-foreground shadow-sm hover:bg-accent cursor-pointer transition-colors"
-                onClick={() => {
-                  setQ("");
-                  setResults([]);
-                  load(fav);
-                }}
-              >
-                <span>{fav.name.split(",")[0]}</span>
-                <button
-                  type="button"
-                  onClick={(e) => removeFavorite(fav, e)}
-                  className="text-muted-foreground hover:text-foreground text-sm font-semibold leading-none"
-                  title="Remove from favorites"
-                  aria-label={`Remove ${fav.name} from favorites`}
+        {/* Save Favorites & Quick-Access Bar (Directly under Search) */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-card/60 p-2.5">
+          <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
+            <span className="text-xs font-medium text-muted-foreground mr-1">Favorites:</span>
+            {favorites.length === 0 ? (
+              <span className="text-xs text-muted-foreground italic">No saved cities yet</span>
+            ) : (
+              favorites.map((fav) => (
+                <span
+                  key={`${fav.lat},${fav.lon}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs text-card-foreground shadow-xs hover:bg-accent cursor-pointer transition-colors"
+                  onClick={() => {
+                    setQ("");
+                    setResults([]);
+                    load(fav);
+                  }}
+                  title={`View weather for ${fav.name}`}
                 >
-                  ×
-                </button>
-              </span>
-            ))}
+                  <span>{fav.name.split(",")[0]}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => removeFavorite(fav, e)}
+                    className="text-muted-foreground hover:text-destructive text-sm font-semibold leading-none"
+                    title={`Remove ${fav.name} from favorites`}
+                    aria-label={`Remove ${fav.name} from favorites`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))
+            )}
           </div>
-        )}
+
+          {/* Save / Saved Button for the currently viewed city */}
+          {weather && (
+            <button
+              type="button"
+              onClick={() => toggleFavorite(weather.place)}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all ${
+                isFavorite(weather.place, favorites)
+                  ? "border-amber-400/60 bg-amber-400/15 text-amber-600 dark:text-amber-300 shadow-xs"
+                  : "border-input bg-card text-card-foreground hover:bg-accent shadow-xs"
+              }`}
+              title={
+                isFavorite(weather.place, favorites)
+                  ? `Remove ${weather.place.name} from favorites`
+                  : `Save ${weather.place.name} to favorites`
+              }
+            >
+              <span>{isFavorite(weather.place, favorites) ? "★ Saved Favorite" : "☆ Save to Favorites"}</span>
+            </button>
+          )}
+        </div>
 
         {offline && weather && (
           <p className="mt-4 rounded-lg bg-muted px-3 py-2 text-sm text-card-foreground">
