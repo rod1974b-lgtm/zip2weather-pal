@@ -14,6 +14,7 @@ export type Weather = {
     humidity: number;
     uvIndex: number;
     precipitation: number;
+    aqi?: number;
     is_day?: number;
   };
   sun: {
@@ -108,7 +109,7 @@ export async function fetchWeather(place: Place, unit: WeatherUnit = "metric"): 
   const windUnit = unit === "imperial" ? "mph" : "kmh";
   const precipUnit = unit === "imperial" ? "inch" : "mm";
 
-  const url =
+  const weatherUrl =
     `https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}` +
     `&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m,uv_index,precipitation,is_day` +
     `&hourly=temperature_2m,weather_code,precipitation_probability` +
@@ -116,9 +117,25 @@ export async function fetchWeather(place: Place, unit: WeatherUnit = "metric"): 
     `&temperature_unit=${tempUnit}&wind_speed_unit=${windUnit}&precipitation_unit=${precipUnit}` +
     `&timezone=auto&forecast_days=7`;
 
-  const r = await fetch(url);
-  if (!r.ok) throw new Error("Weather request failed");
-  const j = await r.json();
+  const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${place.lat}&longitude=${place.lon}&current=us_aqi`;
+
+  const [weatherRes, aqiRes] = await Promise.allSettled([
+    fetch(weatherUrl).then((r) => {
+      if (!r.ok) throw new Error("Weather request failed");
+      return r.json();
+    }),
+    fetch(aqiUrl).then((r) => (r.ok ? r.json() : null)),
+  ]);
+
+  if (weatherRes.status === "rejected") {
+    throw new Error("Weather request failed");
+  }
+
+  const j = weatherRes.value;
+  let aqi: number | undefined;
+  if (aqiRes.status === "fulfilled" && aqiRes.value?.current?.us_aqi !== undefined) {
+    aqi = Math.round(aqiRes.value.current.us_aqi);
+  }
 
   const today = j.daily.time[0];
   const hourly = j.hourly.time
@@ -130,7 +147,6 @@ export async function fetchWeather(place: Place, unit: WeatherUnit = "metric"): 
     }))
     .filter((h: { time: string }) => h.time.startsWith(today));
 
-  // Extract dawn and dusk times (HH:MM)
   const formatSunTime = (iso?: string) => (iso ? iso.slice(11, 16) : "--:--");
   const sunrise = formatSunTime(j.daily.sunrise?.[0]);
   const sunset = formatSunTime(j.daily.sunset?.[0]);
@@ -147,6 +163,7 @@ export async function fetchWeather(place: Place, unit: WeatherUnit = "metric"): 
       humidity: j.current.relative_humidity_2m ?? 0,
       uvIndex: Math.round(j.current.uv_index ?? 0),
       precipitation: j.current.precipitation ?? 0,
+      aqi,
       is_day: j.current.is_day,
     },
     sun: { sunrise, sunset },
@@ -188,7 +205,14 @@ export function uvCategory(uv: number): string {
   return "Extreme";
 }
 
-/** Key of the sky-gradient class used for the page background. */
+export function aqiCategory(aqi: number): { label: string; color: string } {
+  if (aqi <= 50) return { label: "Good", color: "text-emerald-500" };
+  if (aqi <= 100) return { label: "Moderate", color: "text-yellow-500" };
+  if (aqi <= 150) return { label: "Sensitive", color: "text-orange-500" };
+  if (aqi <= 200) return { label: "Unhealthy", color: "text-red-500" };
+  return { label: "Very Unhealthy", color: "text-purple-500" };
+}
+
 export function skyKey(code: number, isDay: number | undefined): string {
   const day = isDay !== 0;
   if (code <= 2) return day ? "clear-day" : "clear-night";
@@ -199,4 +223,50 @@ export function skyKey(code: number, isDay: number | undefined): string {
   if (code <= 82) return "rain";
   if (code <= 86) return "snow";
   return "storm";
+}
+
+export function getWeatherAlert(w: Weather): { icon: string; message: string; severity: "info" | "warning" } | null {
+  if (w.current.code >= 95) {
+    return { icon: "⛈️", message: "Severe thunderstorm warning in this area.", severity: "warning" };
+  }
+  if (w.current.code >= 51 && w.current.code <= 82) {
+    return { icon: "🌧️", message: "Rain currently falling. Roads may be slick.", severity: "info" };
+  }
+  const nextRain = w.hourly.slice(0, 4).find((h) => h.precipProb >= 60);
+  if (nextRain) {
+    const hour = nextRain.time.slice(11, 16);
+    return {
+      icon: "💧",
+      message: `Rain expected around ${hour} (${nextRain.precipProb}% chance).`,
+      severity: "info",
+    };
+  }
+  const highWindLimit = w.unit === "imperial" ? 25 : 40;
+  if (w.current.wind >= highWindLimit) {
+    return {
+      icon: "💨",
+      message: `High wind advisory: gusts up to ${Math.round(w.current.wind)} ${w.unit === "imperial" ? "mph" : "km/h"}.`,
+      severity: "warning",
+    };
+  }
+  return null;
+}
+
+export function getClothingAdvice(w: Weather): string {
+  const tempC = w.unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
+  let tip = "";
+
+  if (tempC < 5) tip = "🧥 Heavy winter coat, gloves, and warm layers needed.";
+  else if (tempC < 14) tip = "🧥 A warm jacket or sweater is recommended.";
+  else if (tempC < 21) tip = "👕 Mild weather — light layers or long sleeves work best.";
+  else if (tempC < 28) tip = "🩳 Warm and pleasant — comfortable t-shirt and shorts.";
+  else tip = "☀️ Hot weather — stay hydrated and wear loose, breathable clothes.";
+
+  if (w.current.code >= 51 && w.current.code <= 82) {
+    tip += " Don't forget an umbrella! ☂️";
+  } else if (w.current.uvIndex >= 6) {
+    tip += " High UV — wear sunscreen and sunglasses. 🕶️";
+  }
+
+  return tip;
 }
