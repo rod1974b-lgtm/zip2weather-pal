@@ -1,6 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { describe, fetchWeather, loadCached, searchCity, skyKey, type Place, type Weather } from "@/lib/weather";
+import { useEffect, useRef, useState } from "react";
+import {
+  describe,
+  fetchWeather,
+  loadCached,
+  loadUnitPref,
+  saveUnitPref,
+  searchCity,
+  skyKey,
+  uvCategory,
+  type Place,
+  type Weather,
+  type WeatherUnit,
+} from "@/lib/weather";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,64 +41,129 @@ const SKY_OPTIONS = [
   { value: "storm", label: "Storm" },
 ];
 
+function formatTimeAgo(timestamp: number): string {
+  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+  if (diffSec < 60) return "Just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return new Date(timestamp).toLocaleDateString();
+}
+
 function Index() {
   const [weather, setWeather] = useState<Weather | null>(null);
+  const [unit, setUnit] = useState<WeatherUnit>("metric");
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Place[]>([]);
+  const [searching, setSearching] = useState(false);
   const [showLocDialog, setShowLocDialog] = useState(false);
   const [skyChoice, setSkyChoice] = useState("auto");
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function load(place: Place) {
-    setLoading(true);
+  async function load(place: Place, targetUnit: WeatherUnit = unit, isRefresh = false) {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
-      setWeather(await fetchWeather(place));
+      const data = await fetchWeather(place, targetUnit);
+      setWeather(data);
       setOffline(false);
     } catch {
       setOffline(true);
       setError("Couldn't reach the weather service. Showing last saved weather if available.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
+  // Load preferences from local storage on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(SKY_PREF_KEY);
-      if (saved && SKY_OPTIONS.some((o) => o.value === saved)) setSkyChoice(saved);
+      const savedSky = localStorage.getItem(SKY_PREF_KEY);
+      if (savedSky && SKY_OPTIONS.some((o) => o.value === savedSky)) {
+        setSkyChoice(savedSky);
+      }
     } catch {}
-  }, []);
 
-  useEffect(() => {
+    const savedUnit = loadUnitPref();
+    setUnit(savedUnit);
+
     const cached = loadCached();
     if (cached) {
       setWeather(cached);
-      if (navigator.onLine) load(cached.place);
-      else setOffline(true);
+      if (navigator.onLine) {
+        load(cached.place, savedUnit);
+      } else {
+        setOffline(true);
+      }
     }
-    const on = () => setOffline(false);
-    const off = () => setOffline(true);
-    window.addEventListener("online", on);
-    window.addEventListener("offline", off);
+
+    const onOnline = () => setOffline(false);
+    const onOffline = () => setOffline(true);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
     return () => {
-      window.removeEventListener("online", on);
-      window.removeEventListener("offline", off);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
     };
   }, []);
 
-  async function onSearch(e: React.FormEvent) {
+  // Debounced search suggestions
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    const trimmed = q.trim();
+    if (trimmed.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const r = await searchCity(trimmed);
+        setResults(r);
+      } catch {
+        // Soft fail on autocomplete
+      } finally {
+        setSearching(false);
+      }
+    }, 350);
+
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [q]);
+
+  function toggleUnit(nextUnit: WeatherUnit) {
+    if (nextUnit === unit) return;
+    setUnit(nextUnit);
+    saveUnitPref(nextUnit);
+    if (weather) {
+      load(weather.place, nextUnit);
+    }
+  }
+
+  async function onSearchSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!q.trim()) return;
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    setLoading(true);
     try {
-      const r = await searchCity(q.trim());
+      const r = await searchCity(trimmed);
       setResults(r);
       if (!r.length) setError("No matching city found.");
       else setError(null);
     } catch {
       setError("Search needs an internet connection.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -115,9 +192,32 @@ function Index() {
   return (
     <div className={`sky sky-${sky} min-h-screen text-foreground`}>
       <main className="mx-auto max-w-2xl px-4 py-8">
-        <header className="mb-6 flex items-center justify-between gap-3">
+        <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight">My Weather Pal</h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* Unit toggle */}
+            <div className="flex items-center rounded-lg border border-input bg-card p-0.5 text-xs text-card-foreground">
+              <button
+                type="button"
+                onClick={() => toggleUnit("metric")}
+                className={`rounded-md px-2 py-1 font-medium transition-colors ${
+                  unit === "metric" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                °C
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleUnit("imperial")}
+                className={`rounded-md px-2 py-1 font-medium transition-colors ${
+                  unit === "imperial" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                °F
+              </button>
+            </div>
+
+            {/* Sky theme selector */}
             <select
               value={skyChoice}
               onChange={onSkyChange}
@@ -137,14 +237,19 @@ function Index() {
           </div>
         </header>
 
-        <form onSubmit={onSearch} className="flex gap-2">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search a city…"
-            aria-label="Search a city"
-            className="min-w-0 flex-1 rounded-lg border border-input bg-card px-3 py-2 text-card-foreground outline-none focus:ring-2 focus:ring-ring"
-          />
+        <form onSubmit={onSearchSubmit} className="relative flex gap-2">
+          <div className="relative min-w-0 flex-1">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search a city…"
+              aria-label="Search a city"
+              className="w-full rounded-lg border border-input bg-card px-3 py-2 text-card-foreground outline-none focus:ring-2 focus:ring-ring"
+            />
+            {searching && (
+              <span className="absolute right-3 top-2.5 text-xs text-muted-foreground">Searching…</span>
+            )}
+          </div>
           <button className="rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground">Search</button>
           <button
             type="button"
@@ -155,26 +260,28 @@ function Index() {
           >
             📍
           </button>
-        </form>
 
-        {results.length > 0 && (
-          <ul className="mt-2 divide-y divide-border rounded-lg border border-border bg-card text-card-foreground">
-            {results.map((r) => (
-              <li key={`${r.lat},${r.lon}`}>
-                <button
-                  className="w-full px-3 py-2 text-left hover:bg-accent"
-                  onClick={() => {
-                    setResults([]);
-                    setQ("");
-                    load(r);
-                  }}
-                >
-                  {r.name} <span className="text-muted-foreground">{r.country}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+          {/* Autocomplete suggestions dropdown */}
+          {results.length > 0 && (
+            <ul className="absolute left-0 right-0 top-full z-40 mt-1 divide-y divide-border rounded-lg border border-border bg-card text-card-foreground shadow-lg">
+              {results.map((r) => (
+                <li key={`${r.lat},${r.lon}`}>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left hover:bg-accent focus:bg-accent outline-none"
+                    onClick={() => {
+                      setResults([]);
+                      setQ("");
+                      load(r);
+                    }}
+                  >
+                    {r.name} <span className="text-muted-foreground text-xs">{r.country}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </form>
 
         {offline && weather && (
           <p className="mt-4 rounded-lg bg-muted px-3 py-2 text-sm text-card-foreground">
@@ -182,13 +289,19 @@ function Index() {
           </p>
         )}
         {error && !offline && <p className="mt-4 text-sm text-destructive">{error}</p>}
-        {loading && <p className="mt-4 text-sm text-muted-foreground">Loading…</p>}
+        {loading && !refreshing && <p className="mt-4 text-sm text-muted-foreground">Loading…</p>}
 
         {!weather && !loading && (
           <p className="mt-12 text-center text-muted-foreground">Search for a city or use your location to begin.</p>
         )}
 
-        {weather && <WeatherView w={weather} />}
+        {weather && (
+          <WeatherView
+            w={weather}
+            refreshing={refreshing}
+            onRefresh={() => load(weather.place, unit, true)}
+          />
+        )}
       </main>
 
       {showLocDialog && (
@@ -214,58 +327,144 @@ function Index() {
   );
 }
 
-function WeatherView({ w }: { w: Weather }) {
+function WeatherView({
+  w,
+  refreshing,
+  onRefresh,
+}: {
+  w: Weather;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
   const d = describe(w.current.code);
+  const tempSymbol = w.unit === "imperial" ? "°F" : "°C";
+  const windUnit = w.unit === "imperial" ? "mph" : "km/h";
+  const precipUnit = w.unit === "imperial" ? "in" : "mm";
+
   return (
     <>
+      {/* Current conditions card */}
       <section className="mt-6 rounded-2xl bg-card p-6 text-card-foreground shadow-sm">
-        <p className="text-sm text-muted-foreground">
-          {w.place.name}
-          {w.place.country ? `, ${w.place.country}` : ""}
-        </p>
-        <div className="mt-2 flex items-center gap-4">
-          <span className="text-6xl">{d.icon}</span>
+        <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="text-6xl font-bold">{Math.round(w.current.temp)}°</p>
-            <p className="text-muted-foreground">
-              {d.label} · Feels {Math.round(w.current.feels)}° · Wind {Math.round(w.current.wind)} km/h
+            <p className="text-sm font-medium text-muted-foreground">
+              {w.place.name}
+              {w.place.country ? `, ${w.place.country}` : ""}
+            </p>
+            <div className="mt-2 flex items-center gap-4">
+              <span className="text-6xl" role="img" aria-label={d.label}>
+                {d.icon}
+              </span>
+              <div>
+                <p className="text-6xl font-bold tracking-tight">
+                  {Math.round(w.current.temp)}°
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {d.label} · Feels like {Math.round(w.current.feels)}°
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Refresh trigger & relative time */}
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            title="Refresh forecast"
+            aria-label="Refresh forecast"
+            className="flex items-center gap-1.5 rounded-lg border border-input bg-card px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <span className={`inline-block ${refreshing ? "animate-spin" : ""}`}>🔄</span>
+            <span>{refreshing ? "Updating…" : formatTimeAgo(w.fetchedAt)}</span>
+          </button>
+        </div>
+
+        {/* Current Metrics Grid */}
+        <div className="mt-6 grid grid-cols-2 gap-3 border-t border-border pt-4 sm:grid-cols-4">
+          <div className="rounded-lg bg-muted/40 p-2.5 text-center">
+            <span className="text-xs text-muted-foreground">Humidity</span>
+            <p className="text-lg font-semibold">{w.current.humidity}%</p>
+          </div>
+          <div className="rounded-lg bg-muted/40 p-2.5 text-center">
+            <span className="text-xs text-muted-foreground">Wind</span>
+            <p className="text-lg font-semibold">
+              {Math.round(w.current.wind)} <span className="text-xs font-normal text-muted-foreground">{windUnit}</span>
+            </p>
+          </div>
+          <div className="rounded-lg bg-muted/40 p-2.5 text-center">
+            <span className="text-xs text-muted-foreground">UV Index</span>
+            <p className="text-lg font-semibold">
+              {w.current.uvIndex}{" "}
+              <span className="text-xs font-normal text-muted-foreground">({uvCategory(w.current.uvIndex)})</span>
+            </p>
+          </div>
+          <div className="rounded-lg bg-muted/40 p-2.5 text-center">
+            <span className="text-xs text-muted-foreground">Precipitation</span>
+            <p className="text-lg font-semibold">
+              {w.current.precipitation} <span className="text-xs font-normal text-muted-foreground">{precipUnit}</span>
             </p>
           </div>
         </div>
+
+        {/* Sunrise & Sunset */}
+        {(w.sun.sunrise !== "--:--" || w.sun.sunset !== "--:--") && (
+          <div className="mt-3 flex items-center justify-around rounded-lg bg-muted/20 py-2 text-xs text-muted-foreground">
+            <span>🌅 Sunrise: <strong className="text-card-foreground">{w.sun.sunrise}</strong></span>
+            <span>🌇 Sunset: <strong className="text-card-foreground">{w.sun.sunset}</strong></span>
+          </div>
+        )}
       </section>
 
+      {/* Hourly forecast with precipitation indicators */}
       <section className="mt-6">
         <h2 className="mb-2 font-semibold">Today</h2>
         <div className="flex gap-2 overflow-x-auto pb-2">
           {w.hourly.map((h) => (
             <div key={h.time} className="min-w-16 rounded-lg bg-card px-2 py-3 text-center text-card-foreground">
               <p className="text-xs text-muted-foreground">{h.time.slice(11, 16)}</p>
-              <p className="text-xl">{describe(h.code).icon}</p>
+              <p className="text-xl my-1">{describe(h.code).icon}</p>
               <p className="font-medium">{Math.round(h.temp)}°</p>
+              {h.precipProb > 0 && (
+                <span className="mt-1 block text-[10px] text-blue-500 font-medium">
+                  💧{h.precipProb}%
+                </span>
+              )}
             </div>
           ))}
         </div>
       </section>
 
+      {/* 7-day forecast */}
       <section className="mt-6">
         <h2 className="mb-2 font-semibold">7 days</h2>
         <ul className="divide-y divide-border rounded-lg bg-card text-card-foreground">
           {w.daily.map((day, i) => (
             <li key={day.date} className="flex items-center justify-between px-4 py-3">
-              <span className="w-24">
+              <span className="w-24 text-sm">
                 {i === 0 ? "Today" : new Date(day.date + "T12:00").toLocaleDateString(undefined, { weekday: "long" })}
               </span>
-              <span className="text-xl" title={describe(day.code).label}>{describe(day.code).icon}</span>
-              <span className="w-24 text-right">
-                <span className="font-medium">{Math.round(day.max)}°</span>{" "}
+              <div className="flex items-center gap-2">
+                <span className="text-xl" title={describe(day.code).label}>
+                  {describe(day.code).icon}
+                </span>
+                {day.precipProbMax > 0 && (
+                  <span className="text-xs text-blue-500 font-medium">
+                    💧{day.precipProbMax}%
+                  </span>
+                )}
+              </div>
+              <span className="w-24 text-right text-sm">
+                <span className="font-semibold">{Math.round(day.max)}°</span>{" "}
                 <span className="text-muted-foreground">{Math.round(day.min)}°</span>
               </span>
             </li>
           ))}
         </ul>
       </section>
+
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        Data by <a className="underline" href="https://open-meteo.com/">Open-Meteo</a>
+        Data by <a className="underline hover:text-foreground" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a>
       </p>
     </>
   );
