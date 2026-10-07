@@ -58,6 +58,78 @@ function formatTimeAgo(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString();
 }
 
+function getTickerAlerts(w: Weather): Array<{ icon: string; text: string; severity: "warning" | "caution" | "clear" }> {
+  const items: Array<{ icon: string; text: string; severity: "warning" | "caution" | "clear" }> = [];
+
+  // Primary severe or active weather alert (thunderstorm, rain, high wind)
+  const primary = getWeatherAlert(w);
+  if (primary) {
+    items.push({
+      icon: primary.icon,
+      text: primary.message,
+      severity: primary.severity === "warning" ? "warning" : "caution",
+    });
+  }
+
+  // Temperature extreme warnings
+  const tempC = w.unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
+  if (tempC <= 0) {
+    items.push({
+      icon: "❄️",
+      text: `Freeze warning: freezing temperatures (${Math.round(w.current.temp)}°${w.unit === "imperial" ? "F" : "C"}). Watch for slick roads.`,
+      severity: "warning",
+    });
+  } else if (tempC >= 35) {
+    items.push({
+      icon: "🔥",
+      text: `Excessive heat alert: temperatures reaching ${Math.round(w.current.temp)}°${w.unit === "imperial" ? "F" : "C"}. Stay hydrated.`,
+      severity: "warning",
+    });
+  }
+
+  // UV index caution
+  if (w.current.uvIndex >= 8) {
+    items.push({
+      icon: "☀️",
+      text: `Very High UV Index (${w.current.uvIndex}). Sunscreen and sun protection strongly advised.`,
+      severity: "caution",
+    });
+  }
+
+  // Air quality caution
+  if (w.current.aqi !== undefined && w.current.aqi >= 101) {
+    const aqiCat = aqiCategory(w.current.aqi);
+    items.push({
+      icon: "😷",
+      text: `Air Quality Advisory: AQI ${w.current.aqi} (${aqiCat.label}). Sensitive groups should reduce outdoor exposure.`,
+      severity: w.current.aqi >= 151 ? "warning" : "caution",
+    });
+  }
+
+  // Rain probability check if no active storm/rain is already flagged
+  if (!primary) {
+    const nextRain = w.hourly.slice(0, 6).find((h) => h.precipProb >= 50);
+    if (nextRain) {
+      items.push({
+        icon: "💧",
+        text: `Precipitation likely around ${nextRain.time.slice(11, 16)} (${nextRain.precipProb}% probability).`,
+        severity: "caution",
+      });
+    }
+  }
+
+  // If no adverse conditions, show calm/all-clear
+  if (items.length === 0) {
+    items.push({
+      icon: "✅",
+      text: "All Clear · No active severe weather warnings · Calm conditions in your area.",
+      severity: "clear",
+    });
+  }
+
+  return items;
+}
+
 function Index() {
   const [weather, setWeather] = useState<Weather | null>(null);
   const [unit, setUnit] = useState<WeatherUnit>("metric");
@@ -487,26 +559,14 @@ function WeatherView({
   const precipUnit = w.unit === "imperial" ? "in" : "mm";
   const tempSymbol = w.unit === "imperial" ? "°F" : "°C";
 
-  const alert = getWeatherAlert(w);
   const advice = getClothingAdvice(w);
   const aqiInfo = w.current.aqi !== undefined ? aqiCategory(w.current.aqi) : null;
+  const tickerAlerts = getTickerAlerts(w);
+  const isSevere = tickerAlerts.some((a) => a.severity === "warning");
+  const isCaution = tickerAlerts.some((a) => a.severity === "caution");
 
   return (
     <>
-      {/* Weather Alert Banner */}
-      {alert && (
-        <div
-          className={`mt-4 flex items-center gap-2.5 rounded-xl border p-3 text-sm shadow-xs ${
-            alert.severity === "warning"
-              ? "border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-300"
-              : "border-blue-500/40 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-          }`}
-        >
-          <span className="text-lg">{alert.icon}</span>
-          <span className="font-medium">{alert.message}</span>
-        </div>
-      )}
-
       {/* Current conditions card */}
       <section className="mt-4 rounded-2xl bg-card p-6 text-card-foreground shadow-sm">
         <div className="flex items-start justify-between gap-2">
@@ -560,9 +620,60 @@ function WeatherView({
           </button>
         </div>
 
+        {/* Weather Alerts Ticker (Directly over What to wear) */}
+        <div
+          className={`mt-4 overflow-hidden rounded-xl border text-xs shadow-2xs ${
+            isSevere
+              ? "border-red-500/40 bg-red-500/10 text-red-950 dark:text-red-200"
+              : isCaution
+              ? "border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-200"
+              : "border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:text-emerald-200"
+          }`}
+        >
+          <div className="flex items-center">
+            {/* Ticker Beacon Badge */}
+            <div
+              className={`flex shrink-0 items-center gap-1.5 border-r px-3 py-2 text-[11px] font-bold uppercase tracking-wider ${
+                isSevere
+                  ? "border-red-500/30 bg-red-500/20 text-red-600 dark:text-red-400"
+                  : isCaution
+                  ? "border-amber-500/30 bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                  : "border-emerald-500/30 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+              }`}
+            >
+              <span className="relative flex h-2 w-2">
+                <span
+                  className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${
+                    isSevere ? "bg-red-400" : isCaution ? "bg-amber-400" : "bg-emerald-400"
+                  }`}
+                />
+                <span
+                  className={`relative inline-flex h-2 w-2 rounded-full ${
+                    isSevere ? "bg-red-500" : isCaution ? "bg-amber-500" : "bg-emerald-500"
+                  }`}
+                />
+              </span>
+              <span>Alerts Ticker</span>
+            </div>
+
+            {/* Scrolling Ticker Track */}
+            <div className="relative flex-1 overflow-hidden py-2">
+              <div className="weather-ticker-track flex w-max items-center gap-8 whitespace-nowrap hover:[animation-play-state:paused]">
+                {tickerAlerts.concat(tickerAlerts).map((item, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-1.5 text-card-foreground">
+                    <span className="text-sm">{item.icon}</span>
+                    <span className="font-medium">{item.text}</span>
+                    <span className="font-light text-muted-foreground/50">✦</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* What to Wear / Advice Tip */}
-        <div className="mt-4 rounded-lg bg-muted/40 p-3 text-xs leading-relaxed text-card-foreground">
-          <span className="font-semibold text-muted-foreground mr-1.5">What to wear:</span>
+        <div className="mt-2.5 rounded-lg bg-muted/40 p-3 text-xs leading-relaxed text-card-foreground">
+          <span className="mr-1.5 font-semibold text-muted-foreground">What to wear:</span>
           {advice}
         </div>
 
@@ -598,7 +709,7 @@ function WeatherView({
               )}
             </p>
           </div>
-          <div className="rounded-lg bg-muted/30 p-2.5 text-center col-span-2 sm:col-span-1">
+          <div className="col-span-2 rounded-lg bg-muted/30 p-2.5 text-center sm:col-span-1">
             <span className="text-xs text-muted-foreground">Precipitation</span>
             <p className="text-base font-semibold">
               {w.current.precipitation} <span className="text-xs font-normal text-muted-foreground">{precipUnit}</span>
@@ -622,10 +733,10 @@ function WeatherView({
           {w.hourly.map((h) => (
             <div key={h.time} className="min-w-16 rounded-lg bg-card px-2 py-3 text-center text-card-foreground">
               <p className="text-xs text-muted-foreground">{h.time.slice(11, 16)}</p>
-              <p className="text-xl my-1">{describe(h.code).icon}</p>
+              <p className="my-1 text-xl">{describe(h.code).icon}</p>
               <p className="font-medium">{Math.round(h.temp)}°</p>
               {h.precipProb > 0 && (
-                <span className="mt-1 block text-[10px] text-blue-500 font-medium">
+                <span className="mt-1 block text-[10px] font-medium text-blue-500">
                   💧{h.precipProb}%
                 </span>
               )}
@@ -648,7 +759,7 @@ function WeatherView({
                   {describe(day.code).icon}
                 </span>
                 {day.precipProbMax > 0 && (
-                  <span className="text-xs text-blue-500 font-medium">
+                  <span className="text-xs font-medium text-blue-500">
                     💧{day.precipProbMax}%
                   </span>
                 )}
@@ -665,6 +776,20 @@ function WeatherView({
       <p className="mt-6 text-center text-xs text-muted-foreground">
         Data by <a className="underline hover:text-foreground" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a>
       </p>
+
+      {/* Self-contained continuous ticker animation styles */}
+      <style>{`
+        @keyframes weatherTickerAnimation {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .weather-ticker-track {
+          animation: weatherTickerAnimation 22s linear infinite;
+        }
+        .weather-ticker-track:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
     </>
   );
 }
