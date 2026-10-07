@@ -48,6 +48,13 @@ const SKY_OPTIONS = [
   { value: "storm", label: "Storm" },
 ];
 
+export interface TickerAlertItem {
+  icon: string;
+  tag: string;
+  text: string;
+  severity: "disaster" | "warning" | "caution" | "clear";
+}
+
 function formatTimeAgo(timestamp: number): string {
   const diffSec = Math.floor((Date.now() - timestamp) / 1000);
   if (diffSec < 60) return "Just now";
@@ -58,71 +65,250 @@ function formatTimeAgo(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString();
 }
 
-function getTickerAlerts(w: Weather): Array<{ icon: string; text: string; severity: "warning" | "caution" | "clear" }> {
-  const items: Array<{ icon: string; text: string; severity: "warning" | "caution" | "clear" }> = [];
+function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
 
-  // Primary severe or active weather alert (thunderstorm, rain, high wind)
-  const primary = getWeatherAlert(w);
-  if (primary) {
-    items.push({
-      icon: primary.icon,
-      text: primary.message,
-      severity: primary.severity === "warning" ? "warning" : "caution",
-    });
+async function fetchNearbyEarthquakes(lat: number, lon: number): Promise<TickerAlertItem[]> {
+  try {
+    const res = await fetch(
+      `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&latitude=${lat}&longitude=${lon}&maxradiuskm=500&minmagnitude=4.2&limit=3`,
+      { signal: AbortSignal.timeout(3500) }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const now = Date.now();
+    const items: TickerAlertItem[] = [];
+
+    for (const f of data.features || []) {
+      const ageHours = (now - f.properties.time) / (1000 * 3600);
+      if (ageHours > 48) continue;
+      const mag = f.properties.mag ?? 0;
+      const placeName = f.properties.place || "nearby region";
+      const hasTsunami = f.properties.tsunami === 1;
+      const [eqLon, eqLat] = f.geometry?.coordinates ?? [0, 0];
+      const dist = calculateDistanceKm(lat, lon, eqLat, eqLon);
+
+      if (hasTsunami) {
+        items.push({
+          icon: "🌊",
+          tag: "TSUNAMI ADVISORY",
+          text: `Potential tsunami warning triggered by offshore M${mag.toFixed(1)} seismic event (${dist} km away in ${placeName}). Move away from coastal areas.`,
+          severity: "disaster",
+        });
+      } else {
+        items.push({
+          icon: "🌋",
+          tag: "EARTHQUAKE REPORT",
+          text: `M${mag.toFixed(1)} earthquake recorded ${dist} km away (${placeName}) ~${Math.round(ageHours)}h ago. Watch for aftershocks.`,
+          severity: mag >= 6.0 ? "disaster" : "warning",
+        });
+      }
+    }
+    return items;
+  } catch {
+    return [];
   }
+}
 
-  // Temperature extreme warnings
+function evaluateAllDisastersAndAlerts(w: Weather, seismicItems: TickerAlertItem[] = []): TickerAlertItem[] {
+  const items: TickerAlertItem[] = [...seismicItems];
+  const windMph = w.unit === "imperial" ? w.current.wind : w.current.wind * 0.621371;
   const tempC = w.unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
-  if (tempC <= 0) {
+  const feelsC = w.unit === "imperial" ? ((w.current.feels - 32) * 5) / 9 : w.current.feels;
+  const windUnit = w.unit === "imperial" ? "mph" : "km/h";
+  const tempUnit = w.unit === "imperial" ? "°F" : "°C";
+
+  // 1. TORNADO & VIOLENT HAIL DISASTERS (WMO 96, 99)
+  if (w.current.code === 99) {
     items.push({
-      icon: "❄️",
-      text: `Freeze warning: freezing temperatures (${Math.round(w.current.temp)}°${w.unit === "imperial" ? "F" : "C"}). Watch for slick roads.`,
-      severity: "warning",
+      icon: "🌪️",
+      tag: "TORNADO / VIOLENT HAIL EMERGENCY",
+      text: "Destructive rotating winds and heavy damaging hail reported. Seek certified storm shelter immediately.",
+      severity: "disaster",
     });
-  } else if (tempC >= 35) {
+  } else if (w.current.code === 96) {
     items.push({
-      icon: "🔥",
-      text: `Excessive heat alert: temperatures reaching ${Math.round(w.current.temp)}°${w.unit === "imperial" ? "F" : "C"}. Stay hydrated.`,
+      icon: "⚡",
+      tag: "SEVERE HAILSTORM DISASTER",
+      text: "Severe thunderstorm with damaging large hail and violent downdrafts. Move vehicles and stay indoors.",
+      severity: "disaster",
+    });
+  } else if (w.current.code === 95) {
+    items.push({
+      icon: "⛈️",
+      tag: "SEVERE THUNDERSTORM WARNING",
+      text: "Dangerous cloud-to-ground lightning strikes and torrential rainfall active.",
       severity: "warning",
     });
   }
 
-  // UV index caution
-  if (w.current.uvIndex >= 8) {
+  // 2. HURRICANE, CYCLONE, TYPHOON & GALE DISASTERS
+  if (windMph >= 74) {
     items.push({
-      icon: "☀️",
-      text: `Very High UV Index (${w.current.uvIndex}). Sunscreen and sun protection strongly advised.`,
+      icon: "🌀",
+      tag: "HURRICANE / TYPHOON EMERGENCY",
+      text: `Catastrophic hurricane-force winds detected (${Math.round(w.current.wind)} ${windUnit}). Structural destruction imminent. Shelter in interior rooms.`,
+      severity: "disaster",
+    });
+  } else if (windMph >= 55) {
+    items.push({
+      icon: "🌀",
+      tag: "STORM-FORCE VIOLENT GALE",
+      text: `Violent gale-force winds (${Math.round(w.current.wind)} ${windUnit}). Widespread tree failure and power line destruction expected.`,
+      severity: "disaster",
+    });
+  } else if (windMph >= 39) {
+    items.push({
+      icon: "💨",
+      tag: "TROPICAL GALE ADVISORY",
+      text: `Hazardous gale winds (${Math.round(w.current.wind)} ${windUnit}). Secure all loose outdoor items.`,
+      severity: "warning",
+    });
+  }
+
+  // 3. FLASH FLOOD & TORRENTIAL RAIN DISASTER
+  const isHeavyRainCode = w.current.code === 65 || w.current.code === 82;
+  const precipMm = w.unit === "imperial" ? w.current.precipitation * 25.4 : w.current.precipitation;
+  if (precipMm >= 15 || (isHeavyRainCode && precipMm >= 8)) {
+    items.push({
+      icon: "🌊",
+      tag: "FLASH FLOOD EMERGENCY",
+      text: "Dangerous torrential rainfall and rapid street flooding underway. Never attempt to drive through flooded roads.",
+      severity: "disaster",
+    });
+  } else if (isHeavyRainCode || w.current.code === 63 || w.current.code === 81) {
+    items.push({
+      icon: "🌧️",
+      tag: "HEAVY RAIN FLOOD ADVISORY",
+      text: "Saturated ground and localized street flooding risk. Exercise extreme road caution.",
       severity: "caution",
     });
   }
 
-  // Air quality caution
-  if (w.current.aqi !== undefined && w.current.aqi >= 101) {
-    const aqiCat = aqiCategory(w.current.aqi);
+  // 4. BLIZZARD, ICE STORM & WINTER DISASTERS
+  const isSnowCode = [71, 73, 75, 77, 85, 86].includes(w.current.code);
+  const isIceCode = [56, 57, 66, 67].includes(w.current.code);
+
+  if (isIceCode) {
     items.push({
-      icon: "😷",
-      text: `Air Quality Advisory: AQI ${w.current.aqi} (${aqiCat.label}). Sensitive groups should reduce outdoor exposure.`,
-      severity: w.current.aqi >= 151 ? "warning" : "caution",
+      icon: "🧊",
+      tag: "ICE STORM DISASTER WARNING",
+      text: "Catastrophic glaze ice accretion on power lines and highways. Treacherous black ice travel hazard.",
+      severity: "disaster",
+    });
+  } else if (isSnowCode && windMph >= 28) {
+    items.push({
+      icon: "❄️",
+      tag: "BLIZZARD DISASTER EMERGENCY",
+      text: "Life-threatening zero-visibility whiteout conditions and heavy drifting snow. Travel is impossible.",
+      severity: "disaster",
+    });
+  } else if (w.current.code === 75 || w.current.code === 86) {
+    items.push({
+      icon: "🌨️",
+      tag: "HEAVY SNOWFALL WARNING",
+      text: "Significant rapid snow accumulation creating impassable roads and travel delays.",
+      severity: "warning",
     });
   }
 
-  // Rain probability check if no active storm/rain is already flagged
-  if (!primary) {
-    const nextRain = w.hourly.slice(0, 6).find((h) => h.precipProb >= 50);
-    if (nextRain) {
+  // 5. EXTREME HEATWAVE & FLASH DROUGHT DISASTERS
+  if (feelsC >= 42 || tempC >= 40) {
+    items.push({
+      icon: "🔥",
+      tag: "EXTREME HEAT DISASTER EMERGENCY",
+      text: `Life-threatening heat index (${Math.round(w.current.feels)}${tempUnit}). High risk of fatal heat stroke. Remain in air-conditioned environments.`,
+      severity: "disaster",
+    });
+  } else if (tempC >= 35) {
+    items.push({
+      icon: "☀️",
+      tag: "EXCESSIVE HEAT ADVISORY",
+      text: `Dangerous heat index (${Math.round(w.current.temp)}${tempUnit}). Heavy hydration required; avoid midday sun.`,
+      severity: "warning",
+    });
+  }
+
+  // 6. ARCTIC POLAR FREEZE & FROSTBITE DISASTERS
+  if (feelsC <= -25 || tempC <= -20) {
+    items.push({
+      icon: "🥶",
+      tag: "ARCTIC POLAR FREEZE EMERGENCY",
+      text: `Dangerous hypothermia hazard (${Math.round(w.current.feels)}${tempUnit}). Severe frostbite occurs in under 10 minutes on exposed skin.`,
+      severity: "disaster",
+    });
+  } else if (tempC <= -5) {
+    items.push({
+      icon: "❄️",
+      tag: "HARD FREEZE WARNING",
+      text: `Sub-freezing temperatures (${Math.round(w.current.temp)}${tempUnit}). Severe pipe freeze risk and black ice on overpasses.`,
+      severity: "warning",
+    });
+  }
+
+  // 7. TOXIC AIR QUALITY & WILDFIRE SMOKE DISASTERS
+  if (w.current.aqi !== undefined) {
+    if (w.current.aqi >= 301) {
       items.push({
-        icon: "💧",
-        text: `Precipitation likely around ${nextRain.time.slice(11, 16)} (${nextRain.precipProb}% probability).`,
+        icon: "☣️",
+        tag: "HAZARDOUS WILDFIRE SMOKE / AIR CRISIS",
+        text: `Emergency health warning (AQI ${w.current.aqi}). Entire population severely affected. Stay indoors with sealed air filtration.`,
+        severity: "disaster",
+      });
+    } else if (w.current.aqi >= 201) {
+      items.push({
+        icon: "😷",
+        tag: "VERY UNHEALTHY AIR DISASTER",
+        text: `Severe particulate pollution (AQI ${w.current.aqi}). Wear certified N95 respirators outdoors.`,
+        severity: "warning",
+      });
+    } else if (w.current.aqi >= 151) {
+      items.push({
+        icon: "⚠️",
+        tag: "UNHEALTHY AIR QUALITY ADVISORY",
+        text: `Air Quality Index ${w.current.aqi}. Unhealthy conditions for children, elderly, and sensitive groups.`,
         severity: "caution",
       });
     }
   }
 
-  // If no adverse conditions, show calm/all-clear
+  // 8. EXTREME UV RADIATION HAZARD
+  if (w.current.uvIndex >= 11) {
+    items.push({
+      icon: "☀️",
+      tag: "EXTREME UV RADIATION HAZARD",
+      text: `Extreme UV Index (${w.current.uvIndex}). Severe skin and retina damage in under 10 minutes. Avoid direct sunlight.`,
+      severity: "warning",
+    });
+  }
+
+  // 9. UPCOMING PRECIPITATION ADVISORY
+  const nextRain = w.hourly.slice(0, 5).find((h) => h.precipProb >= 60);
+  if (nextRain && !isHeavyRainCode && w.current.code < 51) {
+    items.push({
+      icon: "💧",
+      tag: "RAIN ONSET ADVISORY",
+      text: `Precipitation starting around ${nextRain.time.slice(11, 16)} (${nextRain.precipProb}% chance). Carry rain protection.`,
+      severity: "caution",
+    });
+  }
+
+  // 10. ALL CLEAR CHECK
   if (items.length === 0) {
     items.push({
-      icon: "✅",
-      text: "All Clear · No active severe weather warnings · Calm conditions in your area.",
+      icon: "🛡️",
+      tag: "ALL CLEAR",
+      text: "No active meteorological, seismic, or natural disaster emergencies reported for this area.",
       severity: "clear",
     });
   }
@@ -134,6 +320,7 @@ function Index() {
   const [weather, setWeather] = useState<Weather | null>(null);
   const [unit, setUnit] = useState<WeatherUnit>("metric");
   const [favorites, setFavorites] = useState<Place[]>([]);
+  const [nearbyDisasters, setNearbyDisasters] = useState<TickerAlertItem[]>([]);
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -151,6 +338,12 @@ function Index() {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     setError(null);
+
+    // Fetch live earthquake/seismic disaster feeds asynchronously
+    fetchNearbyEarthquakes(place.lat, place.lon)
+      .then((items) => setNearbyDisasters(items))
+      .catch(() => setNearbyDisasters([]));
+
     try {
       const data = await fetchWeather(place, targetUnit);
       setWeather(data);
@@ -490,6 +683,7 @@ function Index() {
         {weather && (
           <WeatherView
             w={weather}
+            disasters={nearbyDisasters}
             refreshing={refreshing}
             isFav={isFavorite(weather.place, favorites)}
             onToggleFav={() => toggleFavorite(weather.place)}
@@ -543,12 +737,14 @@ function Index() {
 
 function WeatherView({
   w,
+  disasters,
   refreshing,
   isFav,
   onToggleFav,
   onRefresh,
 }: {
   w: Weather;
+  disasters: TickerAlertItem[];
   refreshing: boolean;
   isFav: boolean;
   onToggleFav: () => void;
@@ -561,9 +757,11 @@ function WeatherView({
 
   const advice = getClothingAdvice(w);
   const aqiInfo = w.current.aqi !== undefined ? aqiCategory(w.current.aqi) : null;
-  const tickerAlerts = getTickerAlerts(w);
-  const isSevere = tickerAlerts.some((a) => a.severity === "warning");
-  const isCaution = tickerAlerts.some((a) => a.severity === "caution");
+
+  const allAlerts = evaluateAllDisastersAndAlerts(w, disasters);
+  const hasDisaster = allAlerts.some((a) => a.severity === "disaster");
+  const hasWarning = allAlerts.some((a) => a.severity === "warning");
+  const hasCaution = allAlerts.some((a) => a.severity === "caution");
 
   return (
     <>
@@ -620,12 +818,14 @@ function WeatherView({
           </button>
         </div>
 
-        {/* Weather Alerts Ticker (Directly over What to wear) */}
+        {/* Disaster & Weather Alerts Ticker (Directly over What to wear) */}
         <div
           className={`mt-4 overflow-hidden rounded-xl border text-xs shadow-2xs ${
-            isSevere
+            hasDisaster
+              ? "border-red-600/60 bg-red-600/15 text-red-950 dark:text-red-200"
+              : hasWarning
               ? "border-red-500/40 bg-red-500/10 text-red-950 dark:text-red-200"
-              : isCaution
+              : hasCaution
               ? "border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-200"
               : "border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:text-emerald-200"
           }`}
@@ -634,9 +834,11 @@ function WeatherView({
             {/* Ticker Beacon Badge */}
             <div
               className={`flex shrink-0 items-center gap-1.5 border-r px-3 py-2 text-[11px] font-bold uppercase tracking-wider ${
-                isSevere
+                hasDisaster
+                  ? "border-red-600/40 bg-red-600/25 text-red-700 dark:text-red-300"
+                  : hasWarning
                   ? "border-red-500/30 bg-red-500/20 text-red-600 dark:text-red-400"
-                  : isCaution
+                  : hasCaution
                   ? "border-amber-500/30 bg-amber-500/20 text-amber-600 dark:text-amber-400"
                   : "border-emerald-500/30 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
               }`}
@@ -644,24 +846,37 @@ function WeatherView({
               <span className="relative flex h-2 w-2">
                 <span
                   className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${
-                    isSevere ? "bg-red-400" : isCaution ? "bg-amber-400" : "bg-emerald-400"
+                    hasDisaster
+                      ? "bg-red-500"
+                      : hasWarning
+                      ? "bg-red-400"
+                      : hasCaution
+                      ? "bg-amber-400"
+                      : "bg-emerald-400"
                   }`}
                 />
                 <span
                   className={`relative inline-flex h-2 w-2 rounded-full ${
-                    isSevere ? "bg-red-500" : isCaution ? "bg-amber-500" : "bg-emerald-500"
+                    hasDisaster
+                      ? "bg-red-600"
+                      : hasWarning
+                      ? "bg-red-500"
+                      : hasCaution
+                      ? "bg-amber-500"
+                      : "bg-emerald-500"
                   }`}
                 />
               </span>
-              <span>Alerts Ticker</span>
+              <span>{hasDisaster ? "🚨 DISASTERS TICKER" : hasWarning ? "⚠️ ALERTS TICKER" : hasCaution ? "⚡ ADVISORY TICKER" : "🛡️ ALL CLEAR"}</span>
             </div>
 
-            {/* Scrolling Ticker Track */}
+            {/* Continuous Marquee Track */}
             <div className="relative flex-1 overflow-hidden py-2">
               <div className="weather-ticker-track flex w-max items-center gap-8 whitespace-nowrap hover:[animation-play-state:paused]">
-                {tickerAlerts.concat(tickerAlerts).map((item, idx) => (
+                {allAlerts.concat(allAlerts).map((item, idx) => (
                   <span key={idx} className="inline-flex items-center gap-1.5 text-card-foreground">
                     <span className="text-sm">{item.icon}</span>
+                    <span className="font-semibold text-foreground">[{item.tag}]:</span>
                     <span className="font-medium">{item.text}</span>
                     <span className="font-light text-muted-foreground/50">✦</span>
                   </span>
@@ -774,7 +989,7 @@ function WeatherView({
       </section>
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        Data by <a className="underline hover:text-foreground" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a>
+        Data by <a className="underline hover:text-foreground" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a> & <a className="underline hover:text-foreground" href="https://earthquake.usgs.gov/" target="_blank" rel="noopener noreferrer">USGS</a>
       </p>
 
       {/* Self-contained continuous ticker animation styles */}
@@ -784,7 +999,7 @@ function WeatherView({
           100% { transform: translateX(-50%); }
         }
         .weather-ticker-track {
-          animation: weatherTickerAnimation 22s linear infinite;
+          animation: weatherTickerAnimation 24s linear infinite;
         }
         .weather-ticker-track:hover {
           animation-play-state: paused;
