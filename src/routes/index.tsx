@@ -127,7 +127,50 @@ async function fetchNearbyEarthquakes(lat: number, lon: number): Promise<TickerA
   }
 }
 
+async function fetchLiveRiverFlood(lat: number, lon: number): Promise<TickerAlertItem[]> {
+  try {
+    const res = await fetch(
+      `https://flood-api.open-meteo.com/v1/flood?latitude=${lat}&longitude=${lon}&daily=river_discharge,river_discharge_mean,river_discharge_max&forecast_days=3`,
+      { signal: AbortSignal.timeout(3500) }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const discharge = data.daily?.river_discharge?.[0];
+    const mean = data.daily?.river_discharge_mean?.[0];
+
+    if (discharge !== undefined && mean !== undefined && mean > 0) {
+      const ratio = discharge / mean;
+      if (ratio >= 2.0 || (discharge >= 100 && ratio >= 1.5)) {
+        return [
+          {
+            icon: "🌊",
+            tag: "RIVER BASIN FLOOD SURGE",
+            text: `River discharge surge detected (${Math.round(discharge)} m³/s, ${Math.round(ratio * 100)}% of baseline). High risk of basin overflow.`,
+            severity: "disaster",
+          },
+        ];
+      } else if (ratio >= 1.4 && discharge >= 20) {
+        return [
+          {
+            icon: "🌊",
+            tag: "RIVER BASIN FLOOD WATCH",
+            text: `Elevated river discharge (${Math.round(discharge)} m³/s). Sustained basin runoff may cause low-lying watercourse flooding.`,
+            severity: "warning",
+          },
+        ];
+      }
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 async function fetchLiveOfficialAlerts(lat: number, lon: number): Promise<TickerAlertItem[]> {
+  // Only query US NWS if coordinates fall inside US territories
+  const isUS = lat >= 18 && lat <= 72 && lon >= -179 && lon <= -65;
+  if (!isUS) return [];
+
   try {
     const res = await fetch(`https://api.weather.gov/alerts/active?point=${lat},${lon}`, {
       headers: { "User-Agent": "MyWeatherPal/1.0 (contact@weatherpal.local)" },
@@ -150,6 +193,9 @@ async function fetchLiveOfficialAlerts(lat: number, lon: number): Promise<Ticker
         severity = lower.includes("warning") ? "disaster" : "warning";
       } else if (lower.includes("heavy rain") || lower.includes("downpour")) {
         icon = "🌧️";
+        severity = "warning";
+      } else if (lower.includes("thunderstorm")) {
+        icon = "⛈️";
         severity = "warning";
       } else if (lower.includes("tornado") || lower.includes("hurricane")) {
         icon = "🌪️";
@@ -174,17 +220,27 @@ function evaluateAllDisastersAndAlerts(
   seismicAndOfficialItems: TickerAlertItem[] = []
 ): TickerAlertItem[] {
   const items: TickerAlertItem[] = [...seismicAndOfficialItems];
+  const lat = w.place.lat;
+  const lon = w.place.lon;
+  const isThailand = lat >= 5.5 && lat <= 20.5 && lon >= 97.3 && lon <= 105.7;
+
   const windMph = w.unit === "imperial" ? w.current.wind : w.current.wind * 0.621371;
   const tempC = w.unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
   const feelsC = w.unit === "imperial" ? ((w.current.feels - 32) * 5) / 9 : w.current.feels;
   const windUnit = w.unit === "imperial" ? "mph" : "km/h";
   const tempUnit = w.unit === "imperial" ? "°F" : "°C";
 
-  // Check if live official feed already reported floods/heavy rains
+  // Check if live external feeds already reported floods, storms, or heavy rains
   const hasLiveFlood = items.some((i) => /flood/i.test(i.tag) || /flood/i.test(i.text));
   const hasLiveRain = items.some((i) => /rain/i.test(i.tag) || /rain/i.test(i.text));
+  const hasLiveStorm = items.some((i) => /thunder|storm/i.test(i.tag) || /thunder|storm/i.test(i.text));
 
-  // 1. TORNADO & VIOLENT HAIL DISASTERS (WMO 96, 99)
+  // 1. THUNDERSTORM WATCH & WARNING (CURRENT + 24-HOUR FORECAST)
+  const isDailyThunderToday = w.daily[0] && [95, 96, 99].includes(w.daily[0].code);
+  const isDailyThunderUpcoming = w.daily.slice(0, 2).some((d) => [95, 96, 99].includes(d.code));
+  const isHourlyThunderUpcoming = w.hourly.slice(0, 12).some((h) => [95, 96, 99].includes(h.code));
+  const hasThunderstormForecast = isDailyThunderToday || isDailyThunderUpcoming || isHourlyThunderUpcoming;
+
   if (w.current.code === 99) {
     items.push({
       icon: "🌪️",
@@ -202,8 +258,19 @@ function evaluateAllDisastersAndAlerts(
   } else if (w.current.code === 95) {
     items.push({
       icon: "⛈️",
-      tag: "SEVERE THUNDERSTORM WARNING",
-      text: "Dangerous cloud-to-ground lightning strikes and torrential rainfall active.",
+      tag: isThailand ? "🇹🇭 TMD: SEVERE THUNDERSTORM WARNING" : "SEVERE THUNDERSTORM WARNING",
+      text: isThailand
+        ? "TMD Weather Warning: Active severe thunderstorm in progress. Frequent lightning strikes, gusty squalls, and heavy localized downpours."
+        : "Dangerous cloud-to-ground lightning strikes and torrential rainfall active. Remain indoors away from windows.",
+      severity: "warning",
+    });
+  } else if (hasThunderstormForecast && !hasLiveStorm) {
+    items.push({
+      icon: "⛈️",
+      tag: isThailand ? "🇹🇭 TMD: THUNDERSTORM WATCH & WARNING" : "THUNDERSTORM WATCH & WARNING",
+      text: isThailand
+        ? "TMD Weather Advisory: Scattered to widespread thunderstorms with sudden gusty squalls and heavy downpours active across the area today."
+        : "Active thunderstorm watch in effect. Cloud-to-ground lightning, localized convective squalls, and heavy downpours anticipated.",
       severity: "warning",
     });
   }
@@ -238,6 +305,7 @@ function evaluateAllDisastersAndAlerts(
   const precipMm = w.unit === "imperial" ? w.current.precipitation * 25.4 : w.current.precipitation;
   const maxDailyProb = Math.max(...(w.daily.map((d) => d.precipProbMax || 0)));
   const heavyRainDays = w.daily.filter((d) => [65, 82].includes(d.code)).length;
+  const thunderDays = w.daily.filter((d) => [95, 96, 99].includes(d.code)).length;
 
   if (!hasLiveFlood) {
     if (precipMm >= 15 || (isHeavyRainCode && precipMm >= 8)) {
@@ -247,28 +315,38 @@ function evaluateAllDisastersAndAlerts(
         text: "Dangerous torrential rainfall and rapid street flooding underway. Never attempt to drive through flooded roads.",
         severity: "disaster",
       });
-    } else if (heavyRainDays >= 1 || (precipMm >= 5 && maxDailyProb >= 70) || isHeavyRainCode) {
+    } else if (
+      heavyRainDays >= 1 ||
+      (isThailand && (thunderDays >= 1 || hasThunderstormForecast) && maxDailyProb >= 60) ||
+      (precipMm >= 4 && maxDailyProb >= 70) ||
+      (hasThunderstormForecast && maxDailyProb >= 65) ||
+      isHeavyRainCode
+    ) {
       items.push({
         icon: "🌊",
-        tag: "RIVER BASIN FLOOD WATCH",
-        text: "Sustained high rainfall runoff threatens river basins and low-lying watercourses. Monitor local waterways.",
+        tag: isThailand ? "🇹🇭 TMD: RIVER BASIN & FLASH FLOOD WATCH" : "RIVER BASIN FLOOD WATCH",
+        text: isThailand
+          ? "TMD Flash Flood Watch: Sustained rainfall runoff threatens river basins, low-lying waterways, and hillsides. Lowland flooding expected."
+          : "Sustained high rainfall runoff threatens river basins and low-lying watercourses. Monitor local waterways.",
         severity: "warning",
       });
     }
   }
 
   if (!hasLiveRain) {
-    if (isHeavyRainCode || precipMm >= 8) {
+    if (isHeavyRainCode || precipMm >= 8 || (hasThunderstormForecast && (precipMm >= 3 || maxDailyProb >= 70))) {
       items.push({
         icon: "🌧️",
-        tag: "HEAVY TO VERY HEAVY RAINS",
-        text: "Intense downpours and low road visibility reported. Significant pooling and travel delays expected.",
+        tag: isThailand ? "🇹🇭 TMD: HEAVY TO VERY HEAVY RAINS" : "HEAVY TO VERY HEAVY RAINS",
+        text: isThailand
+          ? "TMD Heavy Rain Warning: Intense downpours and convective squalls. Low road visibility, street pooling, and sudden gusts expected."
+          : "Intense downpours and low road visibility reported. Significant pooling and travel delays expected.",
         severity: "warning",
       });
     } else if (isModerateRainCode || (precipMm >= 2.5 && precipMm < 8)) {
       items.push({
         icon: "🌧️",
-        tag: "HEAVY RAIN ADVISORY",
+        tag: isThailand ? "🇹🇭 TMD: HEAVY RAIN ADVISORY" : "HEAVY RAIN ADVISORY",
         text: "Saturated ground and localized street drainage pooling risk. Exercise road caution.",
         severity: "caution",
       });
@@ -374,7 +452,7 @@ function evaluateAllDisastersAndAlerts(
 
   // 9. UPCOMING PRECIPITATION ADVISORY
   const nextRain = w.hourly.slice(0, 5).find((h) => h.precipProb >= 60);
-  if (nextRain && !isHeavyRainCode && w.current.code < 51 && !hasLiveRain) {
+  if (nextRain && !isHeavyRainCode && w.current.code < 51 && !hasLiveRain && !hasThunderstormForecast) {
     items.push({
       icon: "💧",
       tag: "RAIN ONSET ADVISORY",
@@ -420,14 +498,16 @@ function Index() {
     else setLoading(true);
     setError(null);
 
-    // Fetch live earthquake/seismic & live official bulletins in parallel
+    // Fetch live earthquake/seismic, global river flood, and official bulletins in parallel
     Promise.allSettled([
       fetchNearbyEarthquakes(place.lat, place.lon),
+      fetchLiveRiverFlood(place.lat, place.lon),
       fetchLiveOfficialAlerts(place.lat, place.lon),
-    ]).then(([eqRes, offRes]) => {
+    ]).then(([eqRes, floodRes, offRes]) => {
       const eqItems = eqRes.status === "fulfilled" ? eqRes.value : [];
+      const floodItems = floodRes.status === "fulfilled" ? floodRes.value : [];
       const offItems = offRes.status === "fulfilled" ? offRes.value : [];
-      setNearbyDisasters([...offItems, ...eqItems]);
+      setNearbyDisasters([...offItems, ...floodItems, ...eqItems]);
     });
 
     try {
@@ -1113,7 +1193,7 @@ function WeatherView({
       </section>
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        Data by <a className="underline hover:text-foreground" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a>, <a className="underline hover:text-foreground" href="https://earthquake.usgs.gov/" target="_blank" rel="noopener noreferrer">USGS</a> & <a className="underline hover:text-foreground" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">NWS</a>
+        Data by <a className="underline hover:text-foreground" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a>, <a className="underline hover:text-foreground" href="https://earthquake.usgs.gov/" target="_blank" rel="noopener noreferrer">USGS</a>, TMD & <a className="underline hover:text-foreground" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">NWS</a>
       </p>
 
       {/* Self-contained continuous ticker animation styles */}
