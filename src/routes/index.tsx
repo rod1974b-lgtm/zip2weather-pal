@@ -167,7 +167,6 @@ async function fetchLiveRiverFlood(lat: number, lon: number): Promise<TickerAler
 }
 
 async function fetchLiveOfficialAlerts(lat: number, lon: number): Promise<TickerAlertItem[]> {
-  // Only query US NWS if coordinates fall inside US territories
   const isUS = lat >= 18 && lat <= 72 && lon >= -179 && lon <= -65;
   if (!isUS) return [];
 
@@ -230,7 +229,6 @@ function evaluateAllDisastersAndAlerts(
   const windUnit = w.unit === "imperial" ? "mph" : "km/h";
   const tempUnit = w.unit === "imperial" ? "°F" : "°C";
 
-  // Check if live external feeds already reported floods, storms, or heavy rains
   const hasLiveFlood = items.some((i) => /flood/i.test(i.tag) || /flood/i.test(i.text));
   const hasLiveRain = items.some((i) => /rain/i.test(i.tag) || /rain/i.test(i.text));
   const hasLiveStorm = items.some((i) => /thunder|storm/i.test(i.tag) || /thunder|storm/i.test(i.text));
@@ -303,7 +301,7 @@ function evaluateAllDisastersAndAlerts(
   const isHeavyRainCode = w.current.code === 65 || w.current.code === 82;
   const isModerateRainCode = w.current.code === 63 || w.current.code === 81;
   const precipMm = w.unit === "imperial" ? w.current.precipitation * 25.4 : w.current.precipitation;
-  const maxDailyProb = Math.max(...(w.daily.map((d) => d.precipProbMax || 0)));
+  const maxDailyProb = Math.max(...w.daily.map((d) => d.precipProbMax || 0));
   const heavyRainDays = w.daily.filter((d) => [65, 82].includes(d.code)).length;
   const thunderDays = w.daily.filter((d) => [95, 96, 99].includes(d.code)).length;
 
@@ -498,7 +496,6 @@ function Index() {
     else setLoading(true);
     setError(null);
 
-    // Fetch live earthquake/seismic, global river flood, and official bulletins in parallel
     Promise.allSettled([
       fetchNearbyEarthquakes(place.lat, place.lon),
       fetchLiveRiverFlood(place.lat, place.lon),
@@ -1145,50 +1142,65 @@ function WeatherView({
         )}
       </section>
 
-      {/* Hourly forecast */}
+      {/* Hourly forecast with weather words */}
       <section className="mt-6">
         <h2 className="mb-2 font-semibold">Today</h2>
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {w.hourly.map((h) => (
-            <div key={h.time} className="min-w-16 rounded-lg bg-card px-2 py-3 text-center text-card-foreground">
-              <p className="text-xs text-muted-foreground">{h.time.slice(11, 16)}</p>
-              <p className="my-1 text-xl">{describe(h.code).icon}</p>
-              <p className="font-medium">{Math.round(h.temp)}°</p>
-              {h.precipProb > 0 && (
-                <span className="mt-1 block text-[10px] font-medium text-blue-500">
-                  💧{h.precipProb}%
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 7-day forecast */}
-      <section className="mt-6">
-        <h2 className="mb-2 font-semibold">7 days</h2>
-        <ul className="divide-y divide-border rounded-lg bg-card text-card-foreground">
-          {w.daily.map((day, i) => (
-            <li key={day.date} className="flex items-center justify-between px-4 py-3">
-              <span className="w-24 text-sm">
-                {i === 0 ? "Today" : new Date(day.date + "T12:00").toLocaleDateString(undefined, { weekday: "long" })}
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="text-xl" title={describe(day.code).label}>
-                  {describe(day.code).icon}
-                </span>
-                {day.precipProbMax > 0 && (
-                  <span className="text-xs font-medium text-blue-500">
-                    💧{day.precipProbMax}%
+          {w.hourly.map((h) => {
+            const desc = describe(h.code);
+            return (
+              <div
+                key={h.time}
+                className="flex min-w-20 flex-col items-center justify-between rounded-lg bg-card px-2 py-3 text-center text-card-foreground shadow-2xs"
+              >
+                <p className="text-xs text-muted-foreground">{h.time.slice(11, 16)}</p>
+                <p className="my-1 text-xl">{desc.icon}</p>
+                <p className="mb-1 line-clamp-1 text-[11px] font-medium leading-tight text-muted-foreground" title={desc.label}>
+                  {desc.label}
+                </p>
+                <p className="font-semibold">{Math.round(h.temp)}°</p>
+                {h.precipProb > 0 && (
+                  <span className="mt-1 block text-[10px] font-medium text-blue-500">
+                    💧{h.precipProb}%
                   </span>
                 )}
               </div>
-              <span className="w-24 text-right text-sm">
-                <span className="font-semibold">{Math.round(day.max)}°</span>{" "}
-                <span className="text-muted-foreground">{Math.round(day.min)}°</span>
-              </span>
-            </li>
-          ))}
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 7-day forecast with visible weather words */}
+      <section className="mt-6">
+        <h2 className="mb-2 font-semibold">7 days</h2>
+        <ul className="divide-y divide-border rounded-lg bg-card text-card-foreground shadow-2xs">
+          {w.daily.map((day, i) => {
+            const desc = describe(day.code);
+            return (
+              <li key={day.date} className="flex items-center justify-between gap-2 px-4 py-3">
+                <span className="w-20 shrink-0 text-sm font-medium sm:w-24">
+                  {i === 0 ? "Today" : new Date(day.date + "T12:00").toLocaleDateString(undefined, { weekday: "short" })}
+                </span>
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className="shrink-0 text-xl" role="img" aria-label={desc.label}>
+                    {desc.icon}
+                  </span>
+                  <span className="truncate text-xs font-normal text-card-foreground sm:text-sm">
+                    {desc.label}
+                  </span>
+                  {day.precipProbMax > 0 && (
+                    <span className="shrink-0 text-xs font-medium text-blue-500">
+                      💧{day.precipProbMax}%
+                    </span>
+                  )}
+                </div>
+                <span className="w-20 shrink-0 text-right text-sm sm:w-24">
+                  <span className="font-semibold">{Math.round(day.max)}°</span>{" "}
+                  <span className="text-muted-foreground">{Math.round(day.min)}°</span>
+                </span>
+              </li>
+            );
+          })}
         </ul>
       </section>
 
