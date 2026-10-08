@@ -1203,7 +1203,7 @@ function WeatherView({
           100% { transform: translateX(-50%); }
         }
         .weather-ticker-track {
-          animation: weatherTickerAnimation 24s linear infinite;
+          animation: weatherTickerAnimation 58s linear infinite;
         }
         .weather-ticker-track:hover {
           animation-play-state: paused;
