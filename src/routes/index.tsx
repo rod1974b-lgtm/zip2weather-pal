@@ -62,6 +62,93 @@ export interface TickerAlertItem {
   severity: "disaster" | "warning" | "caution" | "clear";
 }
 
+const ONBOARDING_SLIDES = [
+  {
+    icon: "🔍",
+    title: "Your weather, anywhere",
+    text: "Search any city — Skopje, Tokyo, or your hometown.",
+  },
+  {
+    icon: "👕🌧️",
+    title: "More than temperature",
+    text: "What to wear, air quality, best time to go outside.",
+  },
+  {
+    icon: "⭐",
+    title: "Save favorites",
+    text: "Track multiple cities and get storm alerts.",
+  },
+];
+
+function OnboardingCarousel({ onFinish }: { onFinish: () => void }) {
+  const [index, setIndex] = useState(0);
+  const slide = ONBOARDING_SLIDES[index];
+
+  function dismiss() {
+    try {
+      localStorage.setItem("hasSeenOnboarding", "true");
+    } catch {}
+    onFinish();
+  }
+
+  function handleNext() {
+    if (index < ONBOARDING_SLIDES.length - 1) {
+      setIndex(index + 1);
+    } else {
+      dismiss();
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-between bg-sky-50 dark:bg-slate-900 p-6 text-foreground">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={dismiss}
+          className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+        >
+          Skip
+        </button>
+      </div>
+
+      <div className="mx-auto flex max-w-sm flex-1 flex-col items-center justify-center text-center">
+        <div className="mb-6 text-6xl select-none" role="img" aria-label="Slide icon">
+          {slide.icon}
+        </div>
+        <h2 className="mb-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          {slide.title}
+        </h2>
+        <p className="text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+          {slide.text}
+        </p>
+
+        <div className="mt-8 flex items-center gap-2">
+          {ONBOARDING_SLIDES.map((_, i) => (
+            <span
+              key={i}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                i === index
+                  ? "w-6 bg-slate-900 dark:bg-white"
+                  : "w-2 bg-slate-300 dark:bg-slate-700"
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="mx-auto w-full max-w-sm pb-4">
+        <button
+          type="button"
+          onClick={handleNext}
+          className="w-full rounded-full bg-slate-900 dark:bg-white py-4 font-semibold text-white dark:text-slate-900 shadow-md transition-colors hover:bg-slate-800 dark:hover:bg-slate-100"
+        >
+          {index === ONBOARDING_SLIDES.length - 1 ? "Get Started" : "Next"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function formatTimeAgo(timestamp: number): string {
   const diffSec = Math.floor((Date.now() - timestamp) / 1000);
   if (diffSec < 60) return "Just now";
@@ -225,7 +312,6 @@ function evaluateAllDisastersAndAlerts(
 
   const windMph = w.unit === "imperial" ? w.current.wind : w.current.wind * 0.621371;
   const tempC = w.unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
-  const feelsC = w.unit === "imperial" ? ((w.current.feels - 32) * 5) / 9 : w.current.feels;
   const windUnit = w.unit === "imperial" ? "mph" : "km/h";
   const tempUnit = w.unit === "imperial" ? "°F" : "°C";
 
@@ -233,7 +319,6 @@ function evaluateAllDisastersAndAlerts(
   const hasLiveRain = items.some((i) => /rain/i.test(i.tag) || /rain/i.test(i.text));
   const hasLiveStorm = items.some((i) => /thunder|storm/i.test(i.tag) || /thunder|storm/i.test(i.text));
 
-  // 1. THUNDERSTORM WATCH & WARNING (CURRENT + 24-HOUR FORECAST)
   const isDailyThunderToday = w.daily[0] && [95, 96, 99].includes(w.daily[0].code);
   const isDailyThunderUpcoming = w.daily.slice(0, 2).some((d) => [95, 96, 99].includes(d.code));
   const isHourlyThunderUpcoming = w.hourly.slice(0, 12).some((h) => [95, 96, 99].includes(h.code));
@@ -273,7 +358,6 @@ function evaluateAllDisastersAndAlerts(
     });
   }
 
-  // 2. HURRICANE, CYCLONE, TYPHOON & GALE DISASTERS
   if (windMph >= 74) {
     items.push({
       icon: "🌀",
@@ -297,106 +381,67 @@ function evaluateAllDisastersAndAlerts(
     });
   }
 
-  // 3. FLASH FLOOD, RIVER BASIN FLOOD WATCH & HEAVY RAIN
-  const isHeavyRainCode = w.current.code === 65 || w.current.code === 82;
-  const isModerateRainCode = w.current.code === 63 || w.current.code === 81;
   const precipMm = w.unit === "imperial" ? w.current.precipitation * 25.4 : w.current.precipitation;
-  const maxDailyProb = Math.max(...w.daily.map((d) => d.precipProbMax || 0));
-  const heavyRainDays = w.daily.filter((d) => [65, 82].includes(d.code)).length;
-  const thunderDays = w.daily.filter((d) => [95, 96, 99].includes(d.code)).length;
+  const isHeavyRainCode = [65, 82].includes(w.current.code);
 
-  if (!hasLiveFlood) {
-    if (precipMm >= 15 || (isHeavyRainCode && precipMm >= 8)) {
-      items.push({
-        icon: "🌊",
-        tag: "FLASH FLOOD EMERGENCY",
-        text: "Dangerous torrential rainfall and rapid street flooding underway. Never attempt to drive through flooded roads.",
-        severity: "disaster",
-      });
-    } else if (
-      heavyRainDays >= 1 ||
-      (isThailand && (thunderDays >= 1 || hasThunderstormForecast) && maxDailyProb >= 60) ||
-      (precipMm >= 4 && maxDailyProb >= 70) ||
-      (hasThunderstormForecast && maxDailyProb >= 65) ||
-      isHeavyRainCode
-    ) {
-      items.push({
-        icon: "🌊",
-        tag: isThailand ? "🇹🇭 TMD: RIVER BASIN & FLASH FLOOD WATCH" : "RIVER BASIN FLOOD WATCH",
-        text: isThailand
-          ? "TMD Flash Flood Watch: Sustained rainfall runoff threatens river basins, low-lying waterways, and hillsides. Lowland flooding expected."
-          : "Sustained high rainfall runoff threatens river basins and low-lying watercourses. Monitor local waterways.",
-        severity: "warning",
-      });
-    }
-  }
-
-  if (!hasLiveRain) {
-    if (isHeavyRainCode || precipMm >= 8 || (hasThunderstormForecast && (precipMm >= 3 || maxDailyProb >= 70))) {
-      items.push({
-        icon: "🌧️",
-        tag: isThailand ? "🇹🇭 TMD: HEAVY TO VERY HEAVY RAINS" : "HEAVY TO VERY HEAVY RAINS",
-        text: isThailand
-          ? "TMD Heavy Rain Warning: Intense downpours and convective squalls. Low road visibility, street pooling, and sudden gusts expected."
-          : "Intense downpours and low road visibility reported. Significant pooling and travel delays expected.",
-        severity: "warning",
-      });
-    } else if (isModerateRainCode || (precipMm >= 2.5 && precipMm < 8)) {
-      items.push({
-        icon: "🌧️",
-        tag: isThailand ? "🇹🇭 TMD: HEAVY RAIN ADVISORY" : "HEAVY RAIN ADVISORY",
-        text: "Saturated ground and localized street drainage pooling risk. Exercise road caution.",
-        severity: "caution",
-      });
-    }
-  }
-
-  // 4. BLIZZARD, ICE STORM & WINTER DISASTERS
-  const isSnowCode = [71, 73, 75, 77, 85, 86].includes(w.current.code);
-  const isIceCode = [56, 57, 66, 67].includes(w.current.code);
-
-  if (isIceCode) {
+  if (precipMm >= 25 || (isHeavyRainCode && precipMm >= 15)) {
     items.push({
-      icon: "🧊",
-      tag: "ICE STORM DISASTER WARNING",
-      text: "Catastrophic glaze ice accretion on power lines and highways. Treacherous black ice travel hazard.",
+      icon: "🌊",
+      tag: isThailand ? "🇹🇭 TMD: FLASH FLOOD & INUNDATION WARNING" : "FLASH FLOOD EMERGENCY",
+      text: isThailand
+        ? "TMD Heavy Monsoon Alert: Very heavy torrential downpours active. Dangerous flash floods and hillside runoff occurring."
+        : `Torrential downpour (${w.current.precipitation} ${w.unit === "imperial" ? "in" : "mm"}). Life-threatening flash inundation active. Avoid flooded roadways.`,
       severity: "disaster",
     });
-  } else if (isSnowCode && windMph >= 28) {
+  } else if (
+    (precipMm >= 8 || isHeavyRainCode || w.daily[0]?.precipSum >= 30) &&
+    !hasLiveRain &&
+    !hasLiveFlood
+  ) {
+    items.push({
+      icon: "🌧️",
+      tag: isThailand ? "🇹🇭 TMD: HEAVY TO VERY HEAVY RAINS WATCH" : "HEAVY RAIN & FLOOD ADVISORY",
+      text: isThailand
+        ? "TMD Hydrological Advisory: Sustained heavy monsoon downpours expected across river basins. Lowlands and watercourses at risk."
+        : "Significant continuous rainfall active. Water accumulation on roadways and localized urban drainage backups expected.",
+      severity: "warning",
+    });
+  }
+
+  const isBlizzard = [75, 86].includes(w.current.code) && windMph >= 35;
+  if (isBlizzard) {
     items.push({
       icon: "❄️",
-      tag: "BLIZZARD DISASTER EMERGENCY",
-      text: "Life-threatening zero-visibility whiteout conditions and heavy drifting snow. Travel is impossible.",
+      tag: "BLIZZARD & WHITEOUT EMERGENCY",
+      text: "Heavy blinding snowfall paired with severe gale winds. Zero visibility and impassable transit networks.",
       severity: "disaster",
     });
-  } else if (w.current.code === 75 || w.current.code === 86) {
+  } else if ([73, 75, 85, 86].includes(w.current.code)) {
     items.push({
       icon: "🌨️",
-      tag: "HEAVY SNOWFALL WARNING",
-      text: "Significant rapid snow accumulation creating impassable roads and travel delays.",
+      tag: "HEAVY WINTER STORM WARNING",
+      text: "Significant snowfall accumulation causing hazardous road conditions and rapid ice accumulation.",
       severity: "warning",
     });
   }
 
-  // 5. EXTREME HEATWAVE & FLASH DROUGHT DISASTERS
-  if (feelsC >= 42 || tempC >= 40) {
+  if (tempC >= 41 || (w.current.feels >= (w.unit === "imperial" ? 115 : 46))) {
     items.push({
       icon: "🔥",
-      tag: "EXTREME HEAT DISASTER EMERGENCY",
-      text: `Life-threatening heat index (${Math.round(w.current.feels)}${tempUnit}). High risk of fatal heat stroke. Remain in air-conditioned environments.`,
+      tag: "EXTREME HEAT DISASTER",
+      text: `Dangerous heat index (${Math.round(w.current.feels)}${tempUnit}). Rapid heatstroke hazard. Stay in air conditioning.`,
       severity: "disaster",
     });
-  } else if (tempC >= 35) {
+  } else if (tempC >= 35 || (w.current.feels >= (w.unit === "imperial" ? 103 : 39))) {
     items.push({
-      icon: "☀️",
-      tag: "EXCESSIVE HEAT ADVISORY",
-      text: `Dangerous heat index (${Math.round(w.current.temp)}${tempUnit}). Heavy hydration required; avoid midday sun.`,
+      icon: "🌡️",
+      tag: "EXCESSIVE HEAT WARNING",
+      text: `Severe heat index (${Math.round(w.current.feels)}${tempUnit}). High risk of heat illness with prolonged outdoor exposure.`,
       severity: "warning",
     });
   }
 
-  // 6. ARCTIC POLAR FREEZE & FROSTBITE DISASTERS
-  if (feelsC <= -25 || tempC <= -20) {
+  if (tempC <= -20 || (w.current.feels <= (w.unit === "imperial" ? -25 : -32))) {
     items.push({
       icon: "🥶",
       tag: "POLAR FREEZE EMERGENCY",
@@ -412,7 +457,6 @@ function evaluateAllDisastersAndAlerts(
     });
   }
 
-  // 7. WILDFIRE SMOKE & DANGEROUS AIR QUALITY CRISIS
   if (w.current.aqi !== undefined) {
     if (w.current.aqi >= 301) {
       items.push({
@@ -438,7 +482,6 @@ function evaluateAllDisastersAndAlerts(
     }
   }
 
-  // 8. EXTREME UV RADIATION HAZARD
   if (w.current.uvIndex >= 11) {
     items.push({
       icon: "☀️",
@@ -448,7 +491,6 @@ function evaluateAllDisastersAndAlerts(
     });
   }
 
-  // 9. UPCOMING PRECIPITATION ADVISORY
   const nextRain = w.hourly.slice(0, 5).find((h) => h.precipProb >= 60);
   if (nextRain && !isHeavyRainCode && w.current.code < 51 && !hasLiveRain && !hasThunderstormForecast) {
     items.push({
@@ -459,7 +501,6 @@ function evaluateAllDisastersAndAlerts(
     });
   }
 
-  // 10. ALL CLEAR CHECK
   if (items.length === 0) {
     items.push({
       icon: "🛡️",
@@ -490,6 +531,7 @@ function Index() {
   const [isStandalone, setIsStandalone] = useState(false);
   const [skyChoice, setSkyChoice] = useState("auto");
   const [fontSizeChoice, setFontSizeChoice] = useState("normal");
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function load(place: Place, targetUnit: WeatherUnit = unit, isRefresh = false) {
@@ -523,6 +565,12 @@ function Index() {
 
   useEffect(() => {
     try {
+      if (!localStorage.getItem("hasSeenOnboarding")) {
+        setShowOnboarding(true);
+      }
+    } catch {}
+
+    try {
       const savedSky = localStorage.getItem(SKY_PREF_KEY);
       if (savedSky && SKY_OPTIONS.some((o) => o.value === savedSky)) {
         setSkyChoice(savedSky);
@@ -540,7 +588,6 @@ function Index() {
 
     const savedUnit = loadUnitPref();
     setUnit(savedUnit);
-
     setFavorites(loadFavorites());
 
     const cached = loadCached();
@@ -702,11 +749,13 @@ function Index() {
 
   return (
     <div className={`sky sky-${sky} min-h-screen text-foreground`}>
+      {showOnboarding && (
+        <OnboardingCarousel onFinish={() => setShowOnboarding(false)} />
+      )}
       <main className="mx-auto max-w-2xl px-4 py-8">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight">My Weather Pal</h1>
           <div className="flex flex-wrap items-center gap-2">
-            {/* US / Metric Unit Toggle Button */}
             <div className="flex items-center rounded-lg border border-input bg-card p-0.5 text-xs text-card-foreground">
               <button
                 type="button"
@@ -734,7 +783,6 @@ function Index() {
               </button>
             </div>
 
-            {/* Install App Button (hidden when already installed) */}
             {!isStandalone && (
               <button
                 type="button"
@@ -746,7 +794,6 @@ function Index() {
               </button>
             )}
 
-            {/* Text Size Selector */}
             <select
               value={fontSizeChoice}
               onChange={onFontSizeChange}
@@ -761,7 +808,6 @@ function Index() {
               ))}
             </select>
 
-            {/* Sky theme selector */}
             <select
               value={skyChoice}
               onChange={onSkyChange}
@@ -781,7 +827,6 @@ function Index() {
           </div>
         </header>
 
-        {/* Search Field */}
         <form onSubmit={onSearchSubmit} className="relative flex gap-2">
           <div className="relative min-w-0 flex-1">
             <input
@@ -806,7 +851,6 @@ function Index() {
             📍
           </button>
 
-          {/* Autocomplete suggestions dropdown */}
           {results.length > 0 && (
             <ul className="absolute left-0 right-0 top-full z-40 mt-1 divide-y divide-border rounded-lg border border-border bg-card text-card-foreground shadow-lg">
               {results.map((r) => (
@@ -828,7 +872,6 @@ function Index() {
           )}
         </form>
 
-        {/* Save Favorites & Quick-Access Bar (Directly under Search) */}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-card/60 p-2.5">
           <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
             <span className="text-xs font-medium text-muted-foreground mr-1">Favorites:</span>
@@ -861,7 +904,6 @@ function Index() {
             )}
           </div>
 
-          {/* Save / Saved Button */}
           {weather && (
             <button
               type="button"
@@ -906,7 +948,6 @@ function Index() {
         )}
       </main>
 
-      {/* Location Permission Dialog */}
       {showLocDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 px-4" role="dialog" aria-modal="true">
           <div className="max-w-sm rounded-xl bg-card p-6 text-card-foreground shadow-lg">
@@ -927,7 +968,6 @@ function Index() {
         </div>
       )}
 
-      {/* Install Instructions Dialog */}
       {showInstallDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 px-4" role="dialog" aria-modal="true">
           <div className="max-w-sm rounded-xl bg-card p-6 text-card-foreground shadow-lg">
@@ -978,7 +1018,6 @@ function WeatherView({
   const hasWarning = allAlerts.some((a) => a.severity === "warning");
   const hasCaution = allAlerts.some((a) => a.severity === "caution");
 
-  // Style-tailored outfit advice
   const tempC = w.unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
   const isRainy = w.current.code >= 51 && w.current.code <= 82;
   const isFreezing = tempC <= 5;
@@ -1003,7 +1042,6 @@ function WeatherView({
     }
   }
 
-  // Calculate best outdoor window
   let outdoorTip = "💡 Best time to go outside: Mid-afternoon (2–4 PM)";
   if (tempC >= 32) {
     outdoorTip = "💡 Best time to go outside: Early morning (before 9 AM) or evening to avoid peak heat";
@@ -1025,7 +1063,6 @@ function WeatherView({
 
   return (
     <>
-      {/* 1. Current conditions hero card */}
       <section className="mt-4 rounded-2xl bg-card p-6 text-card-foreground shadow-sm">
         <div className="flex items-start justify-between gap-2">
           <div>
@@ -1064,7 +1101,6 @@ function WeatherView({
             </div>
           </div>
 
-          {/* Quick Refresh trigger & relative time */}
           <button
             type="button"
             onClick={onRefresh}
@@ -1079,7 +1115,6 @@ function WeatherView({
         </div>
       </section>
 
-      {/* 2. Redesigned What to Wear Section (Primary Competitive Advantage) */}
       <section className="mt-3 rounded-2xl border border-border/80 bg-card p-4 text-card-foreground shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -1101,7 +1136,6 @@ function WeatherView({
           {tailoredAdvice}
         </p>
 
-        {/* Style selector pills */}
         <div className="mt-3 flex items-center gap-2">
           <button
             type="button"
@@ -1138,13 +1172,11 @@ function WeatherView({
           </button>
         </div>
 
-        {/* Outdoor window tip */}
         <div className="mt-3 rounded-lg bg-amber-500/10 border border-amber-500/20 p-2 text-[11px] leading-relaxed text-amber-900 dark:text-amber-200">
           {outdoorTip}
         </div>
       </section>
 
-      {/* 3. Disaster & Weather Alerts Ticker / Accessible All Clear Banner */}
       {!hasDisaster && !hasWarning && !hasCaution ? (
         <div className="mt-3 flex w-full min-h-[56px] flex-wrap items-center overflow-visible rounded-lg bg-green-500 px-3 py-2 text-xs shadow-2xs">
           <div className="flex-1 min-w-0">
@@ -1164,7 +1196,6 @@ function WeatherView({
           }`}
         >
           <div className="flex items-center">
-            {/* Ticker Beacon Badge */}
             <div
               className={`flex shrink-0 items-center gap-1.5 border-r px-3 py-2 text-[11px] font-bold uppercase tracking-wider ${
                 hasDisaster
@@ -1197,7 +1228,6 @@ function WeatherView({
               <span>{hasDisaster ? "🚨 DISASTERS TICKER" : hasWarning ? "⚠️ ALERTS TICKER" : "⚡ ADVISORY TICKER"}</span>
             </div>
 
-            {/* Continuous Marquee Track */}
             <div className="relative flex-1 overflow-hidden py-2">
               <div className="weather-ticker-track flex w-max items-center gap-8 whitespace-nowrap hover:[animation-play-state:paused]">
                 {allAlerts.concat(allAlerts).map((item, idx) => (
@@ -1214,7 +1244,6 @@ function WeatherView({
         </div>
       )}
 
-      {/* 4. Current Metrics Grid (5 metrics) */}
       <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-border pt-4 sm:grid-cols-5">
         <div className="rounded-lg bg-muted/30 p-2.5 text-center">
           <span className="text-xs text-muted-foreground">Humidity</span>
@@ -1254,7 +1283,6 @@ function WeatherView({
         </div>
       </div>
 
-      {/* Sunrise & Sunset */}
       {(w.sun.sunrise !== "--:--" || w.sun.sunset !== "--:--") && (
         <div className="mt-3 flex items-center justify-around rounded-lg bg-muted/20 py-2 text-xs text-muted-foreground">
           <span>🌅 Sunrise: <strong className="text-card-foreground">{w.sun.sunrise}</strong></span>
@@ -1262,7 +1290,6 @@ function WeatherView({
         </div>
       )}
 
-      {/* 5. Hourly forecast with 2-line wrapped weather words */}
       <section className="mt-6">
         <h2 className="mb-2 font-semibold">Today</h2>
         <div className="flex gap-2 overflow-x-auto pb-2">
@@ -1295,7 +1322,6 @@ function WeatherView({
         </div>
       </section>
 
-      {/* 6. 7-day forecast with visible weather words */}
       <section className="mt-6">
         <h2 className="mb-2 font-semibold">7 days</h2>
         <ul className="divide-y divide-border rounded-lg bg-card text-card-foreground shadow-2xs">
@@ -1333,7 +1359,6 @@ function WeatherView({
         Data by <a className="underline hover:text-foreground" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a>, <a className="underline hover:text-foreground" href="https://earthquake.usgs.gov/" target="_blank" rel="noopener noreferrer">USGS</a>, TMD & <a className="underline hover:text-foreground" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">NWS</a>
       </p>
 
-      {/* Self-contained continuous ticker animation styles */}
       <style>{`
         @keyframes weatherTickerAnimation {
           0% { transform: translateX(0); }
