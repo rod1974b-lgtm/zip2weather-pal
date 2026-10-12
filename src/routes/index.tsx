@@ -487,6 +487,7 @@ function Index() {
   const [showLocDialog, setShowLocDialog] = useState(false);
   const [showInstallDialog, setShowInstallDialog] = useState(false);
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
   const [skyChoice, setSkyChoice] = useState("auto");
   const [fontSizeChoice, setFontSizeChoice] = useState("normal");
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -557,9 +558,19 @@ function Index() {
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
 
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      Boolean((window.navigator as any).standalone);
+
+    if (standalone) {
+      setIsStandalone(true);
+    }
+
     const handleBeforeInstall = (e: any) => {
       e.preventDefault();
-      setDeferredInstallPrompt(e);
+      if (!standalone) {
+        setDeferredInstallPrompt(e);
+      }
     };
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
 
@@ -723,15 +734,17 @@ function Index() {
               </button>
             </div>
 
-            {/* Install App Button */}
-            <button
-              type="button"
-              onClick={handleInstallClick}
-              className="rounded-lg border border-input bg-card px-2.5 py-1 text-xs font-medium text-card-foreground hover:bg-accent transition-colors"
-              title="Install My Weather Pal to your home screen"
-            >
-              📲 Install App
-            </button>
+            {/* Install App Button (hidden when already installed) */}
+            {!isStandalone && (
+              <button
+                type="button"
+                onClick={handleInstallClick}
+                className="rounded-lg border border-input bg-card px-2.5 py-1 text-xs font-medium text-card-foreground hover:bg-accent transition-colors"
+                title="Install My Weather Pal to your home screen"
+              >
+                📲 Install App
+              </button>
+            )}
 
             {/* Text Size Selector */}
             <select
