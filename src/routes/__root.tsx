@@ -78,7 +78,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "My Weather Pal" },
+      { title: "My Weather Pal — Private local weather forecasts" },
       { name: "description", content: "Simple, private weather forecasts." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

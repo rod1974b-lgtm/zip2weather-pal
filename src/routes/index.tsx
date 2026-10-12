@@ -24,9 +24,9 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "My Weather Pal" },
+      { title: "My Weather Pal — Private local weather forecasts" },
       { name: "description", content: "Current temperature, hourly and 7-day forecast. No tracking, works offline." },
-      { property: "og:title", content: "My Weather Pal" },
+      { property: "og:title", content: "My Weather Pal — Private local weather forecasts" },
       { property: "og:description", content: "Current temperature, hourly and 7-day forecast. No tracking, works offline." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
