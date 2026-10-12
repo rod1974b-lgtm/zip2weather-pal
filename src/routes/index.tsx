@@ -399,40 +399,40 @@ function evaluateAllDisastersAndAlerts(
   if (feelsC <= -25 || tempC <= -20) {
     items.push({
       icon: "🥶",
-      tag: "ARCTIC POLAR FREEZE EMERGENCY",
-      text: `Dangerous hypothermia hazard (${Math.round(w.current.feels)}${tempUnit}). Severe frostbite occurs in under 10 minutes on exposed skin.`,
+      tag: "POLAR FREEZE EMERGENCY",
+      text: `Dangerous wind chill (${Math.round(w.current.feels)}${tempUnit}). High risk of hypothermia and frostbite in minutes.`,
       severity: "disaster",
     });
   } else if (tempC <= -5) {
     items.push({
       icon: "❄️",
-      tag: "HARD FREEZE WARNING",
-      text: `Sub-freezing temperatures (${Math.round(w.current.temp)}${tempUnit}). Severe pipe freeze risk and black ice on overpasses.`,
+      tag: "HARD FREEZE ADVISORY",
+      text: "Sub-freezing temperatures active. Protect exposed exterior plumbing and vulnerable vegetation.",
       severity: "warning",
     });
   }
 
-  // 7. TOXIC AIR QUALITY & WILDFIRE SMOKE DISASTERS
+  // 7. WILDFIRE SMOKE & DANGEROUS AIR QUALITY CRISIS
   if (w.current.aqi !== undefined) {
     if (w.current.aqi >= 301) {
       items.push({
         icon: "☣️",
-        tag: "HAZARDOUS WILDFIRE SMOKE / AIR CRISIS",
-        text: `Emergency health warning (AQI ${w.current.aqi}). Entire population severely affected. Stay indoors with sealed air filtration.`,
+        tag: "HAZARDOUS SMOKE & TOXIC AIR CRISIS",
+        text: `Severe particulate emergency (AQI ${w.current.aqi}). Hazardous to entire population. Keep windows shut and wear certified respirator.`,
         severity: "disaster",
       });
     } else if (w.current.aqi >= 201) {
       items.push({
         icon: "😷",
-        tag: "VERY UNHEALTHY AIR DISASTER",
-        text: `Severe particulate pollution (AQI ${w.current.aqi}). Wear certified N95 respirators outdoors.`,
+        tag: "VERY UNHEALTHY AIR WARNING",
+        text: `High particulate contamination (AQI ${w.current.aqi}). Sensitive groups avoid all outdoor exertion.`,
         severity: "warning",
       });
     } else if (w.current.aqi >= 151) {
       items.push({
         icon: "⚠️",
-        tag: "UNHEALTHY AIR QUALITY ADVISORY",
-        text: `Air Quality Index ${w.current.aqi}. Unhealthy conditions for children, elderly, and sensitive groups.`,
+        tag: "UNHEALTHY AIR QUALITY CAUTION",
+        text: `Unhealthy particulate levels (AQI ${w.current.aqi}). Wear protection outdoors.`,
         severity: "caution",
       });
     }
@@ -1019,73 +1019,75 @@ function WeatherView({
           </button>
         </div>
 
-        {/* Disaster & Weather Alerts Ticker (Directly over What to wear) */}
-        <div
-          className={`mt-4 overflow-hidden rounded-xl border text-xs shadow-2xs ${
-            hasDisaster
-              ? "border-red-600/60 bg-red-600/15 text-red-950 dark:text-red-200"
-              : hasWarning
-              ? "border-red-500/40 bg-red-500/10 text-red-950 dark:text-red-200"
-              : hasCaution
-              ? "border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-200"
-              : "border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:text-emerald-200"
-          }`}
-        >
-          <div className="flex items-center">
-            {/* Ticker Beacon Badge */}
-            <div
-              className={`flex shrink-0 items-center gap-1.5 border-r px-3 py-2 text-[11px] font-bold uppercase tracking-wider ${
-                hasDisaster
-                  ? "border-red-600/40 bg-red-600/25 text-red-700 dark:text-red-300"
-                  : hasWarning
-                  ? "border-red-500/30 bg-red-500/20 text-red-600 dark:text-red-400"
-                  : hasCaution
-                  ? "border-amber-500/30 bg-amber-500/20 text-amber-600 dark:text-amber-400"
-                  : "border-emerald-500/30 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-              }`}
-            >
-              <span className="relative flex h-2 w-2">
-                <span
-                  className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${
-                    hasDisaster
-                      ? "bg-red-500"
-                      : hasWarning
-                      ? "bg-red-400"
-                      : hasCaution
-                      ? "bg-amber-400"
-                      : "bg-emerald-400"
-                  }`}
-                />
-                <span
-                  className={`relative inline-flex h-2 w-2 rounded-full ${
-                    hasDisaster
-                      ? "bg-red-600"
-                      : hasWarning
-                      ? "bg-red-500"
-                      : hasCaution
-                      ? "bg-amber-500"
-                      : "bg-emerald-500"
-                  }`}
-                />
-              </span>
-              <span>{hasDisaster ? "🚨 DISASTERS TICKER" : hasWarning ? "⚠️ ALERTS TICKER" : hasCaution ? "⚡ ADVISORY TICKER" : "🛡️ ALL CLEAR"}</span>
-            </div>
-
-            {/* Continuous Marquee Track */}
-            <div className="relative flex-1 overflow-hidden py-2">
-              <div className="weather-ticker-track flex w-max items-center gap-8 whitespace-nowrap hover:[animation-play-state:paused]">
-                {allAlerts.concat(allAlerts).map((item, idx) => (
-                  <span key={idx} className="inline-flex items-center gap-1.5 text-card-foreground">
-                    <span className="text-sm">{item.icon}</span>
-                    <span className="font-semibold text-foreground">[{item.tag}]:</span>
-                    <span className="font-medium">{item.text}</span>
-                    <span className="font-light text-muted-foreground/50">✦</span>
-                  </span>
-                ))}
+        {/* Disaster & Weather Alerts Ticker / All Clear Banner (Directly over What to wear) */}
+        {!hasDisaster && !hasWarning && !hasCaution ? (
+          <div className="mt-4 flex w-full min-h-[56px] flex-wrap items-center overflow-visible rounded-lg bg-green-500 px-3 py-2 text-xs shadow-2xs">
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-medium leading-[18px] text-white break-words whitespace-normal">
+                🛡️ All clear - No severe weather expected in your area today. Enjoy your day!
               </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div
+            className={`mt-4 overflow-hidden rounded-xl border text-xs shadow-2xs ${
+              hasDisaster
+                ? "border-red-600/60 bg-red-600/15 text-red-950 dark:text-red-200"
+                : hasWarning
+                ? "border-red-500/40 bg-red-500/10 text-red-950 dark:text-red-200"
+                : "border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-200"
+            }`}
+          >
+            <div className="flex items-center">
+              {/* Ticker Beacon Badge */}
+              <div
+                className={`flex shrink-0 items-center gap-1.5 border-r px-3 py-2 text-[11px] font-bold uppercase tracking-wider ${
+                  hasDisaster
+                    ? "border-red-600/40 bg-red-600/25 text-red-700 dark:text-red-300"
+                    : hasWarning
+                    ? "border-red-500/30 bg-red-500/20 text-red-600 dark:text-red-400"
+                    : "border-amber-500/30 bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                }`}
+              >
+                <span className="relative flex h-2 w-2">
+                  <span
+                    className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${
+                      hasDisaster
+                        ? "bg-red-500"
+                        : hasWarning
+                        ? "bg-red-400"
+                        : "bg-amber-400"
+                    }`}
+                  />
+                  <span
+                    className={`relative inline-flex h-2 w-2 rounded-full ${
+                      hasDisaster
+                        ? "bg-red-600"
+                        : hasWarning
+                        ? "bg-red-500"
+                        : "bg-amber-500"
+                    }`}
+                  />
+                </span>
+                <span>{hasDisaster ? "🚨 DISASTERS TICKER" : hasWarning ? "⚠️ ALERTS TICKER" : "⚡ ADVISORY TICKER"}</span>
+              </div>
+
+              {/* Continuous Marquee Track */}
+              <div className="relative flex-1 overflow-hidden py-2">
+                <div className="weather-ticker-track flex w-max items-center gap-8 whitespace-nowrap hover:[animation-play-state:paused]">
+                  {allAlerts.concat(allAlerts).map((item, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-1.5 text-card-foreground">
+                      <span className="text-sm">{item.icon}</span>
+                      <span className="font-semibold text-foreground">[{item.tag}]:</span>
+                      <span className="font-medium">{item.text}</span>
+                      <span className="font-light text-muted-foreground/50">✦</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* What to Wear / Advice Tip */}
         <div className="mt-2.5 rounded-lg bg-muted/40 p-3 text-xs leading-relaxed text-card-foreground">
