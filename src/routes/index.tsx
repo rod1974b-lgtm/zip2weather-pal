@@ -1144,7 +1144,7 @@ function WeatherView({
         )}
       </section>
 
-      {/* Hourly forecast with weather words */}
+      {/* Hourly forecast with 2-line wrapped weather words */}
       <section className="mt-6">
         <h2 className="mb-2 font-semibold">Today</h2>
         <div className="flex gap-2 overflow-x-auto pb-2">
@@ -1153,16 +1153,21 @@ function WeatherView({
             return (
               <div
                 key={h.time}
-                className="flex min-w-20 flex-col items-center justify-between rounded-lg bg-card px-2 py-3 text-center text-card-foreground shadow-2xs"
+                className="flex w-[72px] min-w-[72px] flex-shrink-0 min-h-[96px] flex-col items-center justify-between rounded-xl bg-card p-2 text-center text-card-foreground shadow-2xs"
               >
                 <p className="text-xs text-muted-foreground">{h.time.slice(11, 16)}</p>
-                <p className="my-1 text-xl">{desc.icon}</p>
-                <p className="mb-1 line-clamp-1 text-[11px] font-medium leading-tight text-muted-foreground" title={desc.label}>
-                  {desc.label}
-                </p>
+                <p className="my-0.5 text-xl">{desc.icon}</p>
+                <div className="flex w-full min-w-0 flex-1 items-center justify-center">
+                  <div
+                    className="text-[11px] font-medium leading-[13px] text-muted-foreground break-words line-clamp-2 text-center"
+                    title={desc.label}
+                  >
+                    {desc.label}
+                  </div>
+                </div>
                 <p className="font-semibold">{Math.round(h.temp)}°</p>
                 {h.precipProb > 0 && (
-                  <span className="mt-1 block text-[10px] font-medium text-blue-500">
+                  <span className="mt-0.5 block text-[10px] font-medium text-blue-500">
                     💧{h.precipProb}%
                   </span>
                 )}
