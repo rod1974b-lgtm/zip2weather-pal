@@ -20,6 +20,8 @@ import {
   type Weather,
   type WeatherUnit,
 } from "@/lib/weather";
+import { LanguageSelector } from "@/components/LanguageSelector";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -514,6 +516,7 @@ function evaluateAllDisastersAndAlerts(
 }
 
 function Index() {
+  const { t } = useTranslation();
   const [weather, setWeather] = useState<Weather | null>(null);
   const [unit, setUnit] = useState<WeatherUnit>("metric");
   const [favorites, setFavorites] = useState<Place[]>([]);
@@ -821,6 +824,7 @@ function Index() {
                 </option>
               ))}
             </select>
+            <LanguageSelector variant="compact" />
             <Link to="/privacy" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
               Privacy
             </Link>
@@ -832,8 +836,8 @@ function Index() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search a city…"
-              aria-label="Search a city"
+              placeholder={t("search")}
+              aria-label={t("search")}
               className="w-full rounded-lg border border-input bg-card px-3 py-2 text-card-foreground outline-none focus:ring-2 focus:ring-ring"
             />
             {searching && (
@@ -874,9 +878,9 @@ function Index() {
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-card/60 p-2.5">
           <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
-            <span className="text-xs font-medium text-muted-foreground mr-1">Favorites:</span>
+            <span className="text-xs font-medium text-muted-foreground mr-1">{t("favorites")}:</span>
             {favorites.length === 0 ? (
-              <span className="text-xs text-muted-foreground italic">No saved cities yet</span>
+              <span className="text-xs text-muted-foreground italic">{t("no_saved")}</span>
             ) : (
               favorites.map((fav) => (
                 <span
@@ -919,7 +923,7 @@ function Index() {
                   : `Save ${weather.place.name} to favorites`
               }
             >
-              <span>{isFavorite(weather.place, favorites) ? "★ Saved Favorite" : "☆ Save to Favorites"}</span>
+              <span>{isFavorite(weather.place, favorites) ? `★ ${t("favorites")}` : `☆ ${t("favorites")}`}</span>
             </button>
           )}
         </div>
@@ -1004,6 +1008,7 @@ function WeatherView({
   onToggleFav: () => void;
   onRefresh: () => void;
 }) {
+  const { t } = useTranslation();
   const d = describe(w.current.code);
   const windUnit = w.unit === "imperial" ? "mph" : "km/h";
   const precipUnit = w.unit === "imperial" ? "in" : "mm";
@@ -1042,13 +1047,13 @@ function WeatherView({
     }
   }
 
-  let outdoorTip = "💡 Best time to go outside: Mid-afternoon (2–4 PM)";
+  let outdoorTip = `💡 ${t("best_time")}: Mid-afternoon (2–4 PM)`;
   if (tempC >= 32) {
-    outdoorTip = "💡 Best time to go outside: Early morning (before 9 AM) or evening to avoid peak heat";
+    outdoorTip = `💡 ${t("best_time")}: Early morning (before 9 AM) or evening to avoid peak heat`;
   } else if (isFreezing) {
-    outdoorTip = "💡 Best time to go outside: Midday (12–2 PM) when temperatures and sun are highest";
+    outdoorTip = `💡 ${t("best_time")}: Midday (12–2 PM) when temperatures and sun are highest`;
   } else if (isRainy) {
-    outdoorTip = "💡 Best time to go outside: Check hourly rain radar for momentary clearing windows";
+    outdoorTip = `💡 ${t("best_time")}: Check hourly rain radar for momentary clearing windows`;
   }
 
   function handleShare() {
@@ -1095,7 +1100,7 @@ function WeatherView({
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {d.label} · Feels like {Math.round(w.current.feels)}{tempSymbol}
+                  {d.label} · {t("feels_like")} {Math.round(w.current.feels)}{tempSymbol}
                 </p>
               </div>
             </div>
@@ -1119,7 +1124,7 @@ function WeatherView({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-xl">👕</span>
-            <h2 className="text-base font-bold tracking-tight">What to Wear Today</h2>
+            <h2 className="text-base font-bold tracking-tight">{t("what_to_wear")}</h2>
           </div>
           <button
             type="button"
@@ -1181,7 +1186,7 @@ function WeatherView({
         <div className="mt-3 flex w-full min-h-[56px] flex-wrap items-center overflow-visible rounded-lg bg-green-500 px-3 py-2 text-xs shadow-2xs">
           <div className="flex-1 min-w-0">
             <div className="text-[13px] font-medium leading-[18px] text-white break-words whitespace-normal">
-              🛡️ All clear - No severe weather expected in your area today. Enjoy your day!
+              🛡️ {t("all_clear")} - No severe weather expected in your area today. Enjoy your day!
             </div>
           </div>
         </div>
@@ -1246,24 +1251,24 @@ function WeatherView({
 
       <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-border pt-4 sm:grid-cols-5">
         <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-          <span className="text-xs text-muted-foreground">Humidity</span>
+          <span className="text-xs text-muted-foreground">{t("humidity")}</span>
           <p className="text-base font-semibold">{w.current.humidity}%</p>
         </div>
         <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-          <span className="text-xs text-muted-foreground">Wind</span>
+          <span className="text-xs text-muted-foreground">{t("wind")}</span>
           <p className="text-base font-semibold">
             {Math.round(w.current.wind)} <span className="text-xs font-normal text-muted-foreground">{windUnit}</span>
           </p>
         </div>
         <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-          <span className="text-xs text-muted-foreground">UV Index</span>
+          <span className="text-xs text-muted-foreground">{t("uv")}</span>
           <p className="text-base font-semibold">
             {w.current.uvIndex}{" "}
             <span className="text-[11px] font-normal text-muted-foreground">({uvCategory(w.current.uvIndex)})</span>
           </p>
         </div>
         <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-          <span className="text-xs text-muted-foreground">Air Quality</span>
+          <span className="text-xs text-muted-foreground">{t("air_quality")}</span>
           <p className="text-base font-semibold">
             {w.current.aqi !== undefined ? (
               <>
@@ -1276,7 +1281,7 @@ function WeatherView({
           </p>
         </div>
         <div className="col-span-2 rounded-lg bg-muted/30 p-2.5 text-center sm:col-span-1">
-          <span className="text-xs text-muted-foreground">Precipitation</span>
+          <span className="text-xs text-muted-foreground">{t("precipitation")}</span>
           <p className="text-base font-semibold">
             {w.current.precipitation} <span className="text-xs font-normal text-muted-foreground">{precipUnit}</span>
           </p>
@@ -1285,13 +1290,13 @@ function WeatherView({
 
       {(w.sun.sunrise !== "--:--" || w.sun.sunset !== "--:--") && (
         <div className="mt-3 flex items-center justify-around rounded-lg bg-muted/20 py-2 text-xs text-muted-foreground">
-          <span>🌅 Sunrise: <strong className="text-card-foreground">{w.sun.sunrise}</strong></span>
-          <span>🌇 Sunset: <strong className="text-card-foreground">{w.sun.sunset}</strong></span>
+          <span>🌅 {t("sunrise")}: <strong className="text-card-foreground">{w.sun.sunrise}</strong></span>
+          <span>🌇 {t("sunset")}: <strong className="text-card-foreground">{w.sun.sunset}</strong></span>
         </div>
       )}
 
       <section className="mt-6">
-        <h2 className="mb-2 font-semibold">Today</h2>
+        <h2 className="mb-2 font-semibold">{t("today")}</h2>
         <div className="flex gap-2 overflow-x-auto pb-2">
           {w.hourly.map((h) => {
             const desc = describe(h.code);
@@ -1323,14 +1328,14 @@ function WeatherView({
       </section>
 
       <section className="mt-6">
-        <h2 className="mb-2 font-semibold">7 days</h2>
+        <h2 className="mb-2 font-semibold">{t("seven_day")}</h2>
         <ul className="divide-y divide-border rounded-lg bg-card text-card-foreground shadow-2xs">
           {w.daily.map((day, i) => {
             const desc = describe(day.code);
             return (
               <li key={day.date} className="flex items-center justify-between gap-2 px-4 py-3">
                 <span className="w-20 shrink-0 text-sm font-medium sm:w-24">
-                  {i === 0 ? "Today" : new Date(day.date + "T12:00").toLocaleDateString(undefined, { weekday: "short" })}
+                  {i === 0 ? t("today") : new Date(day.date + "T12:00").toLocaleDateString(undefined, { weekday: "short" })}
                 </span>
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                   <span className="shrink-0 text-xl" role="img" aria-label={desc.label}>
