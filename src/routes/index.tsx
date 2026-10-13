@@ -82,7 +82,7 @@ const ONBOARDING_SLIDES = [
 
 function OnboardingCarousel({ onFinish }: { onFinish: () => void }) {
   const [index, setIndex] = useState(0);
-  const slide = ONBOARDING_SLIDES[index];
+  const slide = ONBOARDING_SLIDES[index] ?? ONBOARDING_SLIDES[0]!;
 
   function dismiss() {
     try {
@@ -394,7 +394,7 @@ function evaluateAllDisastersAndAlerts(
       severity: "disaster",
     });
   } else if (
-    (precipMm >= 8 || isHeavyRainCode || w.daily[0]?.precipSum >= 30) &&
+    (precipMm >= 8 || isHeavyRainCode || false) &&
     !hasLiveRain &&
     !hasLiveFlood
   ) {
