@@ -757,79 +757,30 @@ function Index() {
         <OnboardingCarousel onFinish={() => setShowOnboarding(false)} />
       )}
       <main className="mx-auto max-w-2xl px-4 py-8">
-        <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight">My Weather Pal</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center rounded-lg border border-input bg-card p-0.5 text-xs text-card-foreground">
-              <button
-                type="button"
-                onClick={() => toggleUnit("imperial")}
-                className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
-                  unit === "imperial"
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                title="Switch to US Imperial (°F, mph, in)"
-              >
-                US (°F)
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleUnit("metric")}
-                className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
-                  unit === "metric"
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                title="Switch to Metric (°C, km/h, mm)"
-              >
-                Metric (°C)
-              </button>
-            </div>
-
-            {!isStandalone && (
-              <button
-                type="button"
-                onClick={handleInstallClick}
-                className="rounded-lg border border-input bg-card px-2.5 py-1 text-xs font-medium text-card-foreground hover:bg-accent transition-colors"
-                title="Install My Weather Pal to your home screen"
-              >
-                📲 Install App
-              </button>
-            )}
-
-            <select
-              value={fontSizeChoice}
-              onChange={onFontSizeChange}
-              aria-label="Text size"
-              title="Adjust text size"
-              className="rounded-lg border border-input bg-card px-2 py-1 text-sm text-card-foreground outline-none focus:ring-2 focus:ring-ring"
-            >
-              {FONT_SIZE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={skyChoice}
-              onChange={onSkyChange}
-              aria-label="Background color"
-              title="Background color"
-              className="rounded-lg border border-input bg-card px-2 py-1 text-sm text-card-foreground outline-none focus:ring-2 focus:ring-ring"
-            >
-              {SKY_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <LanguageSelector variant="compact" />
-            <Link to="/privacy" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-              Privacy
-            </Link>
-          </div>
+          <AppMenu
+            unit={unit}
+            onUnitChange={toggleUnit}
+            skyChoice={skyChoice}
+            onSkyChange={(v) => {
+              setSkyChoice(v);
+              try {
+                if (v === "auto") localStorage.removeItem(SKY_PREF_KEY);
+                else localStorage.setItem(SKY_PREF_KEY, v);
+              } catch {}
+            }}
+            fontSizeChoice={fontSizeChoice}
+            onFontSizeChange={(v) => {
+              setFontSizeChoice(v);
+              const opt = FONT_SIZE_OPTIONS.find((o) => o.value === v);
+              if (opt) document.documentElement.style.fontSize = opt.scale;
+              try {
+                if (v === "normal") localStorage.removeItem(FONT_SIZE_KEY);
+                else localStorage.setItem(FONT_SIZE_KEY, v);
+              } catch {}
+            }}
+          />
         </header>
 
         <form onSubmit={onSearchSubmit} className="relative flex gap-2">
