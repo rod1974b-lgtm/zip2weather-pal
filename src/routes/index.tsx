@@ -394,7 +394,7 @@ function evaluateAllDisastersAndAlerts(
       severity: "disaster",
     });
   } else if (
-    (precipMm >= 8 || isHeavyRainCode || w.daily[0]?.precipSum >= 30) &&
+    (precipMm >= 8 || isHeavyRainCode || false) &&
     !hasLiveRain &&
     !hasLiveFlood
   ) {
