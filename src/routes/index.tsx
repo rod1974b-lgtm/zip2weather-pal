@@ -20,6 +20,7 @@ import {
   type Weather,
   type WeatherUnit,
 } from "@/lib/weather";
+import { LanguageSelector } from "@/components/LanguageSelector";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -821,6 +822,7 @@ function Index() {
                 </option>
               ))}
             </select>
+            <LanguageSelector variant="compact" />
             <Link to="/privacy" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
               Privacy
             </Link>
