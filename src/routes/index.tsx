@@ -1186,7 +1186,7 @@ function WeatherView({
         <div className="mt-3 flex w-full min-h-[56px] flex-wrap items-center overflow-visible rounded-lg bg-green-500 px-3 py-2 text-xs shadow-2xs">
           <div className="flex-1 min-w-0">
             <div className="text-[13px] font-medium leading-[18px] text-white break-words whitespace-normal">
-              🛡️ {t("all_clear")} - No severe weather expected in your area today. Enjoy your day!
+              All clear - No severe weather expected in your area today. Enjoy your day!
             </div>
           </div>
         </div>
