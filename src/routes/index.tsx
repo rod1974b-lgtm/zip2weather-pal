@@ -1008,6 +1008,7 @@ function WeatherView({
   onToggleFav: () => void;
   onRefresh: () => void;
 }) {
+  const { t } = useTranslation();
   const d = describe(w.current.code);
   const windUnit = w.unit === "imperial" ? "mph" : "km/h";
   const precipUnit = w.unit === "imperial" ? "in" : "mm";
