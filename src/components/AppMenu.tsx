@@ -49,8 +49,6 @@ interface AppMenuProps {
   onSkyChange?: (sky: string) => void;
   fontSizeChoice?: string;
   onFontSizeChange?: (size: string) => void;
-  onInstallClick?: () => void;
-  canInstall?: boolean;
 }
 
 export function AppMenu({
@@ -60,18 +58,15 @@ export function AppMenu({
   onSkyChange,
   fontSizeChoice: propFontSize,
   onFontSizeChange,
-  onInstallClick,
-  canInstall,
 }: AppMenuProps = {}) {
   const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Local fallback states if not driven via props
+  // Local fallback state
   const [localUnit, setLocalUnit] = useState<WeatherUnit>("metric");
   const [localSky, setLocalSky] = useState("auto");
   const [localFont, setLocalFont] = useState("normal");
-  const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
     try {
@@ -81,15 +76,10 @@ export function AppMenu({
       if (savedSky) setLocalSky(savedSky);
       const savedFont = localStorage.getItem(FONT_SIZE_KEY);
       if (savedFont) setLocalFont(savedFont);
-
-      const standalone =
-        window.matchMedia("(display-mode: standalone)").matches ||
-        Boolean((window.navigator as any).standalone);
-      setIsStandalone(standalone);
     } catch {}
   }, []);
 
-  // Close on outside click or ESC key
+  // Close when clicking outside or pressing Escape
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -113,43 +103,33 @@ export function AppMenu({
   const activeUnit = propUnit ?? localUnit;
   const activeSky = propSky ?? localSky;
   const activeFont = propFontSize ?? localFont;
-  const showInstall = canInstall !== undefined ? canInstall : !isStandalone;
 
   function handleUnitToggle(nextUnit: WeatherUnit) {
-    if (onUnitChange) {
-      onUnitChange(nextUnit);
-    } else {
-      setLocalUnit(nextUnit);
-      saveUnitPref(nextUnit);
-      window.dispatchEvent(new Event("weather:unit-change"));
-    }
+    setLocalUnit(nextUnit);
+    saveUnitPref(nextUnit);
+    window.dispatchEvent(new Event("weather:unit-change"));
+    onUnitChange?.(nextUnit);
   }
 
   function handleSkySelect(val: string) {
-    if (onSkyChange) {
-      onSkyChange(val);
-    } else {
-      setLocalSky(val);
-      try {
-        if (val === "auto") localStorage.removeItem(SKY_PREF_KEY);
-        else localStorage.setItem(SKY_PREF_KEY, val);
-        window.dispatchEvent(new Event("weather:sky-change"));
-      } catch {}
-    }
+    setLocalSky(val);
+    try {
+      if (val === "auto") localStorage.removeItem(SKY_PREF_KEY);
+      else localStorage.setItem(SKY_PREF_KEY, val);
+      window.dispatchEvent(new Event("weather:sky-change"));
+    } catch {}
+    onSkyChange?.(val);
   }
 
   function handleFontSelect(val: string) {
-    if (onFontSizeChange) {
-      onFontSizeChange(val);
-    } else {
-      setLocalFont(val);
-      const opt = FONT_SIZE_OPTIONS.find((o) => o.value === val);
-      if (opt) document.documentElement.style.fontSize = opt.scale;
-      try {
-        if (val === "normal") localStorage.removeItem(FONT_SIZE_KEY);
-        else localStorage.setItem(FONT_SIZE_KEY, val);
-      } catch {}
-    }
+    setLocalFont(val);
+    const opt = FONT_SIZE_OPTIONS.find((o) => o.value === val);
+    if (opt) document.documentElement.style.fontSize = opt.scale;
+    try {
+      if (val === "normal") localStorage.removeItem(FONT_SIZE_KEY);
+      else localStorage.setItem(FONT_SIZE_KEY, val);
+    } catch {}
+    onFontSizeChange?.(val);
   }
 
   function handleLangSelect(code: string) {
@@ -166,12 +146,12 @@ export function AppMenu({
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-haspopup="true"
-        aria-label={t("settings")}
-        title={t("settings")}
+        aria-label={t("settings") || "Settings"}
+        title={t("settings") || "Settings"}
         className="flex items-center gap-1.5 rounded-lg border border-input bg-card px-3 py-1.5 text-sm font-medium text-card-foreground shadow-xs hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
       >
         <span>⚙️</span>
-        <span>{t("settings")}</span>
+        <span>{t("settings") || "Settings"}</span>
         <span className="text-xs opacity-60">▾</span>
       </button>
 
@@ -183,11 +163,11 @@ export function AppMenu({
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border pb-2 mb-3">
-            <span className="font-semibold text-sm">{t("settings")}</span>
+            <span className="font-semibold text-sm">{t("settings") || "Settings"}</span>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="text-xs text-muted-foreground hover:text-foreground px-1 py-0.5 rounded"
+              className="text-xs text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted"
             >
               ✕
             </button>
@@ -225,7 +205,7 @@ export function AppMenu({
 
             {/* Language */}
             <div>
-              <label className="block font-medium mb-1 text-muted-foreground">{t("language")}</label>
+              <label className="block font-medium mb-1 text-muted-foreground">{t("language") || "Language"}</label>
               <select
                 value={i18n.language || "en"}
                 onChange={(e) => handleLangSelect(e.target.value)}
@@ -271,22 +251,8 @@ export function AppMenu({
               </select>
             </div>
 
-            {/* Action buttons */}
-            <div className="border-t border-border pt-2 space-y-1.5">
-              {showInstall && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsOpen(false);
-                    onInstallClick?.();
-                  }}
-                  className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-input px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
-                >
-                  <span>📲</span>
-                  <span>Install App</span>
-                </button>
-              )}
-
+            {/* Privacy Policy Link */}
+            <div className="border-t border-border pt-2">
               <Link
                 to="/privacy"
                 onClick={() => setIsOpen(false)}
