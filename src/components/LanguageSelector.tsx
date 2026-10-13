@@ -43,7 +43,6 @@ export function LanguageSelector({
   }
 
   if (variant === "compact") {
-    const current = LANGUAGES.find((l) => l.code === lang) ?? LANGUAGES[0];
     return (
       <select
         value={lang}
@@ -56,9 +55,7 @@ export function LanguageSelector({
           <option key={l.code} value={l.code}>
             {l.flag} {l.label}
           </option>
-        ))}
-        {/* keeps `current` referenced for the visible value */}
-        <option hidden>{current.label}</option>
+      ))}
       </select>
     );
   }
