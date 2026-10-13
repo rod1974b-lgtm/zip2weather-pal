@@ -1,3 +1,4 @@
+import { AppMenu } from "@/components/AppMenu";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
