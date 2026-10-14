@@ -73,37 +73,25 @@ const FAMOUS_LANDMARKS: Record<string, string> = {
 function getRegionalTownscape(city: string, country?: string): string {
   const text = `${city} ${country || ""}`.toLowerCase();
 
-  // Southeast Asian towns & countryside
   if (/thailand|vietnam|laos|cambodia|indonesia|malaysia|philippines|myanmar|siam/.test(text)) {
     return `charming tropical townscape of ${city}, traditional ceramic and teak roofs, lush coconut palms, quiet canal or vibrant night market street`;
   }
-
-  // East Asian towns
   if (/japan|korea|taiwan/.test(text)) {
     return `serene streetscape of ${city}, neat tiled rooftops, clean orderly streets, distant forested green hills`;
   }
-
-  // European towns & villages
   if (/france|italy|spain|portugal|germany|austria|switzerland|netherlands|belgium|poland|czech|croatia|greece|sweden|norway|denmark|finland|ireland|scotland|england|uk|macedonia|serbia/.test(text)) {
     return `picturesque European town square in ${city}, charming historic facades, cobblestone alleyway, a village church tower, warm inviting cafe windows`;
   }
-
-  // Latin American towns
   if (/mexico|brazil|argentina|colombia|chile|peru|costa rica|guatemala|cuba/.test(text)) {
     return `colorful vibrant town of ${city}, pastel-painted colonial buildings, central plaza with flowering trees and mountain backdrop`;
   }
-
-  // Middle Eastern & North African towns
   if (/egypt|morocco|turkey|uae|saudi|jordan|oman|tunisia/.test(text)) {
     return `historic sun-warmed stone architecture of ${city}, arched doorways, clay rooftop terraces, warm earthen color palette`;
   }
-
-  // North American & Australasian towns
   if (/usa|united states|canada|australia|new zealand/.test(text)) {
     return `classic scenic townscape of ${city}, leafy main street, charming local buildings, surrounded by open rolling countryside`;
   }
 
-  // Universal small-town fallback
   return `scenic townscape of ${city}, central street and neighborhood rooftops, framed by local landscape and natural horizons`;
 }
 
@@ -142,7 +130,6 @@ export function generateWatercolorPrompt(
 ): string {
   const cityLower = city.toLowerCase();
 
-  // Step 1: Check known iconic landmarks first
   let subject = "";
   for (const [key, landmarkDesc] of Object.entries(FAMOUS_LANDMARKS)) {
     if (cityLower.includes(key)) {
@@ -151,12 +138,10 @@ export function generateWatercolorPrompt(
     }
   }
 
-  // Step 2: If no landmark match, generate realistic regional townscape
   if (!subject) {
     subject = getRegionalTownscape(city, country);
   }
 
-  // Step 3: Add weather atmosphere
   const weatherMood = getWeatherAtmosphere(weatherDesc, temp);
 
   return `vibrant watercolor painting of ${subject}, ${weatherDesc} weather, ${temp}°C, ${weatherMood}, highly saturated vivid colors, master artist quality, clean composition for weather app hero background`;
@@ -195,61 +180,78 @@ function setCache(
   } catch {}
 }
 
-// 6. Generate image with Pollinations AI
-export async function generateWatercolorImage(
-  city: string,
-  weatherDesc: string,
-  temp: number,
-  country?: string
-): Promise<string> {
-  const cacheKey = `${city.toLowerCase()}_${weatherDesc.toLowerCase()}`.replace(/\s+/g, "_");
-  const cache = getCache();
-  if (cache[cacheKey]?.imageUrl) {
-    return cache[cacheKey].imageUrl;
-  }
-
-  const prompt = generateWatercolorPrompt(city, weatherDesc, temp, country);
-  const encodedPrompt = encodeURIComponent(prompt);
-  const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&model=flux&enhance=true&nologo=true&seed=${Math.floor(
-    Math.random() * 10000
-  )}`;
-
-  setCache(cacheKey, {
-    imageUrl,
-    city,
-    weather: weatherDesc,
-    timestamp: Date.now(),
-  });
-
-  if (typeof window !== "undefined") {
+// 6. Preload image verification helper
+export function preloadImage(url: string, timeoutMs = 8000): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  return new Promise((resolve) => {
     const img = new Image();
-    img.src = imageUrl;
-  }
+    let settled = false;
 
-  return imageUrl;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve(false);
+      }
+    }, timeoutMs);
+
+    img.onload = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(true);
+      }
+    };
+
+    img.onerror = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(false);
+      }
+    };
+
+    img.src = url;
+  });
 }
 
-// 7. Instant fallback background while AI generates
-export function getInstantBackground(city: string, weatherCodeOrIcon: string | number): string {
-  const cityLower = city.toLowerCase();
-  if (cityLower.includes("ratchaburi")) return "/backgrounds/vibrant/ratchaburi_haze.jpg";
-  if (cityLower.includes("skopje")) return "/backgrounds/vibrant/skopje_rain.jpg";
-  if (cityLower.includes("bangkok")) return "/backgrounds/vibrant/bangkok_sunny.jpg";
-  if (cityLower.includes("tokyo") || cityLower.includes("kyoto")) return "/backgrounds/vibrant/kyoto_rain.jpg";
-  if (cityLower.includes("new york")) return "/backgrounds/vibrant/cloudy_ny.jpg";
-
+// 7. Instant fallback CSS gradients (rich, zero-network, reliable backdrops)
+export function getInstantBackground(weatherCodeOrIcon: string | number): string {
   const code = Number(weatherCodeOrIcon);
-  if (code === 0 || code === 1) return "/backgrounds/vibrant/sunny_bangkok.jpg";
-  if (code >= 2 && code <= 3) return "/backgrounds/vibrant/overcast.jpg";
-  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return "/backgrounds/vibrant/rain_skopje.jpg";
-  if (code >= 95) return "/backgrounds/vibrant/storm.jpg";
-  if (code >= 71 && code <= 77) return "/backgrounds/vibrant/snow_swiss.jpg";
-  if (code === 45 || code === 48) return "/backgrounds/vibrant/haze_ratchaburi.jpg";
 
-  return "/backgrounds/vibrant/rain_skopje.jpg";
+  // Thunderstorm / Severe
+  if (code >= 95) {
+    return "linear-gradient(135deg, #1d1238 0%, #171d3d 50%, #0d1e2e 100%)";
+  }
+  // Rain / Showers
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
+    return "linear-gradient(135deg, #0f2838 0%, #15384d 50%, #1a4a5e 100%)";
+  }
+  // Snow
+  if (code >= 71 && code <= 77) {
+    return "linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%)";
+  }
+  // Fog / Mist / Haze
+  if (code === 45 || code === 48) {
+    return "linear-gradient(135deg, #2b363c 0%, #3f4c54 50%, #5a6b75 100%)";
+  }
+  // Clear / Sunny
+  if (code === 0 || code === 1) {
+    return "linear-gradient(135deg, #1a3c61 0%, #2563eb 50%, #c2691e 100%)";
+  }
+  // Overcast / Cloudy
+  if (code >= 2 && code <= 3) {
+    return "linear-gradient(135deg, #1e2631 0%, #2d3b4b 50%, #3e4f61 100%)";
+  }
+
+  return "linear-gradient(135deg, #131c26 0%, #1e2c3c 50%, #2f3e50 100%)";
 }
 
 // 8. Main entry point called by WeatherView
+export interface BackgroundResult {
+  initialBg: string;
+  isAi: boolean;
+}
+
 export async function getCityWeatherBackground(
   city: string,
   weatherDesc: string,
@@ -257,27 +259,53 @@ export async function getCityWeatherBackground(
   temp: number,
   onGenerated?: (url: string) => void,
   country?: string
-): Promise<string> {
+): Promise<BackgroundResult> {
+  // Check user manual sky override first
   if (typeof window !== "undefined") {
     const manual = localStorage.getItem("weather:sky-pref") || localStorage.getItem("app_background");
     if (manual && manual !== "auto") {
-      return `/backgrounds/vibrant/${manual}.jpg`;
+      return {
+        initialBg: getInstantBackground(weatherCode),
+        isAi: false,
+      };
     }
   }
 
   const cacheKey = `${city.toLowerCase()}_${weatherDesc.toLowerCase()}`.replace(/\s+/g, "_");
   const cache = getCache();
-  if (cache[cacheKey]?.imageUrl) {
-    return cache[cacheKey].imageUrl;
+  const cachedUrl = cache[cacheKey]?.imageUrl;
+
+  // Instant fallback CSS gradient while generating
+  const fallbackGradient = getInstantBackground(weatherCode);
+
+  // If already in cache, verify image availability quickly
+  if (cachedUrl) {
+    const isLoaded = await preloadImage(cachedUrl, 2500);
+    if (isLoaded) {
+      return { initialBg: cachedUrl, isAi: true };
+    }
   }
 
-  const instant = getInstantBackground(city, weatherCode);
+  // Generate fresh AI artwork in the background
+  const prompt = generateWatercolorPrompt(city, weatherDesc, temp, country);
+  const encodedPrompt = encodeURIComponent(prompt);
+  const freshUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&model=flux&enhance=true&nologo=true&seed=${Math.floor(
+    Math.random() * 10000
+  )}`;
 
-  generateWatercolorImage(city, weatherDesc, temp, country)
-    .then((url) => {
-      if (onGenerated) onGenerated(url);
+  preloadImage(freshUrl, 10000)
+    .then((loaded) => {
+      if (loaded) {
+        setCache(cacheKey, {
+          imageUrl: freshUrl,
+          city,
+          weather: weatherDesc,
+          timestamp: Date.now(),
+        });
+        if (onGenerated) onGenerated(freshUrl);
+      }
     })
-    .catch(console.error);
+    .catch(() => {});
 
-  return instant;
+  return { initialBg: fallbackGradient, isAi: false };
 }
