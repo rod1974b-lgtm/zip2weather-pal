@@ -355,8 +355,8 @@ export function WeatherView({
         <div className="rounded-xl border border-border/80 bg-card p-3 text-center shadow-xs">
           <p className="text-xs text-muted-foreground">{t("uv")}</p>
           <p className="mt-1 text-lg font-bold">
-            {w.current.uv.toFixed(1)}{" "}
-            <span className="text-xs font-normal">({uvCategory(w.current.uv)})</span>
+            {Math.round(w.current.uvIndex ?? 0)}{" "}
+            <span className="text-xs font-normal">({uvCategory(w.current.uvIndex ?? 0)})</span>
           </p>
         </div>
         <div className="rounded-xl border border-border/80 bg-card p-3 text-center shadow-xs">
