@@ -46,7 +46,14 @@ const LANDMARK_WATERCOLORS: Record<string, string> = {
 };
 
 // 2. Curated high-res watercolor artworks by weather condition
-const WEATHER_WATERCOLORS: Record<string, string> = {
+const WEATHER_WATERCOLORS: {
+  thunderstorm: string;
+  rain: string;
+  snow: string;
+  fog: string;
+  clear: string;
+  clouds: string;
+} = {
   thunderstorm:
     "https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=800&q=75",
   rain:
@@ -148,16 +155,8 @@ export async function getCityWeatherBackground(
   onGenerated?: (url: string) => void,
   country?: string
 ): Promise<BackgroundResult> {
-  // Check user manual sky override first
-  if (typeof window !== "undefined") {
-    const manual = localStorage.getItem("weather:sky-pref") || localStorage.getItem("app_background");
-    if (manual && manual !== "auto") {
-      return {
-        initialBg: getInstantBackground(weatherCode),
-        isAi: false,
-      };
-    }
-  }
+  // NOTE: The hero artwork is independent of the page sky setting, so it always
+  // resolves regardless of the user's sky background preference.
 
   const fallbackGradient = getInstantBackground(weatherCode);
   const cityKey = city.toLowerCase();
