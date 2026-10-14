@@ -355,8 +355,8 @@ export function WeatherView({
         <div className="rounded-xl border border-border/80 bg-card p-3 text-center shadow-xs">
           <p className="text-xs text-muted-foreground">{t("uv")}</p>
           <p className="mt-1 text-lg font-bold">
-            {w.current.uv.toFixed(1)}{" "}
-            <span className="text-xs font-normal">({uvCategory(w.current.uv)})</span>
+            {Math.round(w.current.uvIndex ?? 0)}{" "}
+            <span className="text-xs font-normal">({uvCategory(w.current.uvIndex ?? 0)})</span>
           </p>
         </div>
         <div className="rounded-xl border border-border/80 bg-card p-3 text-center shadow-xs">
@@ -389,7 +389,7 @@ export function WeatherView({
             {t("sunrise")} / {t("sunset")}
           </p>
           <p className="mt-1 text-sm font-semibold">
-            ☀️ {w.daily[0]?.sunrise || "—"} · 🌙 {w.daily[0]?.sunset || "—"}
+            ☀️ {w.sun?.sunrise || "—"} · 🌙 {w.sun?.sunset || "—"}
           </p>
         </div>
       </section>
@@ -405,7 +405,7 @@ export function WeatherView({
                 key={i}
                 className="flex w-[72px] shrink-0 flex-col items-center justify-between rounded-xl bg-accent/40 p-2 text-center"
               >
-                <span className="text-xs text-muted-foreground font-medium">{h.time}</span>
+                <span className="text-xs text-muted-foreground font-medium">{h.time.slice(11, 16)}</span>
                 <span className="my-1 text-xl" role="img" aria-label={hd.label}>
                   {hd.icon}
                 </span>
@@ -430,7 +430,11 @@ export function WeatherView({
             const dd = describe(dItem.code);
             return (
               <div key={i} className="flex items-center justify-between py-2.5 text-xs">
-                <span className="w-16 font-medium text-foreground">{dItem.day}</span>
+                <span className="w-16 font-medium text-foreground">
+                  {i === 0
+                    ? t("today")
+                    : new Date(dItem.date + "T12:00:00").toLocaleDateString(undefined, { weekday: "short" })}
+                </span>
                 <div className="flex items-center gap-2">
                   <span className="text-lg" role="img" aria-label={dd.label}>
                     {dd.icon}
