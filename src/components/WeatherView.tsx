@@ -357,7 +357,7 @@ export function WeatherView({
           <p className="mt-1 text-lg font-semibold">
             {w.current.uvIndex ?? 0}{" "}
             <span className="text-xs font-normal text-muted-foreground">
-              ({uvCategory(w.current.uvIndex ?? 0).label})
+              ({uvCategory(w.current.uvIndex ?? 0)})
             </span>
           </p>
         </div>
