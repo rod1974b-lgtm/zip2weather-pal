@@ -52,6 +52,8 @@ export function WeatherView({
   const tempSymbol = w.unit === "imperial" ? "°F" : "°C";
 
   const [heroBg, setHeroBg] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isAiGenerated, setIsAiGenerated] = useState(false);
   const [wearStyle, setWearStyle] = useState<"casual" | "business" | "sport">("casual");
   const baseAdvice = getClothingAdvice(w);
   const aqiInfo = w.current.aqi !== undefined ? aqiCategory(w.current.aqi) : null;
@@ -61,10 +63,13 @@ export function WeatherView({
   const isFreezing = tempC <= 5;
   const isWarm = tempC >= 22;
 
-  // AI Watercolor Background Effect
+  // AI Watercolor Background Effect with Spinner & Badge State
   useEffect(() => {
     if (!w?.place?.name) return;
     let active = true;
+
+    setIsGenerating(true);
+    setIsAiGenerated(false);
 
     getCityWeatherBackground(
       w.place.name,
@@ -72,11 +77,31 @@ export function WeatherView({
       w.current.code,
       Math.round(tempC),
       (aiUrl) => {
-        if (active) setHeroBg(aiUrl);
+        if (active) {
+          setHeroBg(aiUrl);
+          setIsAiGenerated(true);
+          setIsGenerating(false);
+        }
       }
-    ).then((instant) => {
-      if (active && instant) setHeroBg(instant);
-    });
+    )
+      .then((instant) => {
+        if (!active) return;
+        if (instant) setHeroBg(instant);
+        try {
+          const cache = JSON.parse(localStorage.getItem("ai_watercolor_cache") || "{}");
+          const cacheKey = `${w.place.name.toLowerCase()}_${d.label.toLowerCase()}`.replace(/\s+/g, "_");
+          const isCached = Boolean(cache[cacheKey]?.imageUrl);
+          setIsAiGenerated(isCached);
+          if (isCached) {
+            setIsGenerating(false);
+          }
+        } catch {
+          setIsGenerating(false);
+        }
+      })
+      .catch(() => {
+        if (active) setIsGenerating(false);
+      });
 
     return () => {
       active = false;
@@ -135,7 +160,7 @@ export function WeatherView({
 
   return (
     <>
-      {/* 1. HERO CARD WITH AI VIBRANT WATERCOLOR */}
+      {/* 1. HERO CARD WITH AI VIBRANT WATERCOLOR, SPINNER & BADGE */}
       <section
         className="relative mt-4 overflow-hidden rounded-2xl p-6 text-white shadow-lg transition-all duration-700 bg-slate-900 min-h-[190px]"
         style={{
@@ -145,6 +170,14 @@ export function WeatherView({
         }}
       >
         <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]" />
+
+        {/* Spinner while AI generates art */}
+        {isGenerating && (
+          <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-md shadow-sm">
+            <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            <span>Generating vibrant art…</span>
+          </div>
+        )}
 
         <div className="relative z-10">
           <div className="flex items-start justify-between gap-2">
@@ -190,7 +223,9 @@ export function WeatherView({
               disabled={refreshing}
               title="Refresh forecast"
               aria-label="Refresh forecast"
-              className="flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/30 backdrop-blur-md px-2.5 py-1 text-xs text-white hover:bg-black/50 transition-colors"
+              className={`flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/30 backdrop-blur-md px-2.5 py-1 text-xs text-white hover:bg-black/50 transition-colors ${
+                isGenerating ? "mt-7" : ""
+              }`}
             >
               <span className={`inline-block ${refreshing ? "animate-spin" : ""}`}>🔄</span>
               <span>{refreshing ? "Updating…" : formatTimeAgo(w.fetchedAt)}</span>
@@ -198,8 +233,18 @@ export function WeatherView({
           </div>
         </div>
 
-        <div className="absolute bottom-2 right-2.5 z-10 text-[10px] font-medium tracking-wide text-white/70 drop-shadow-sm pointer-events-none">
-          🎨 AI watercolor
+        {/* ✨ AI badge - bottom right */}
+        <div className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 pointer-events-none">
+          {isAiGenerated ? (
+            <div className="flex items-center gap-1 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-2.5 py-1 text-[10px] font-semibold text-white shadow-md">
+              <span>✨</span>
+              <span>AI vibrant watercolor</span>
+            </div>
+          ) : (
+            <div className="rounded-full bg-black/40 px-2.5 py-1 text-[10px] text-white/80 backdrop-blur-sm">
+              Vibrant background
+            </div>
+          )}
         </div>
       </section>
 
