@@ -1,187 +1,94 @@
 // src/lib/aiWatercolorGenerator.ts
 
-// 1. Curated global & regional landmark map (50+ cities)
-const FAMOUS_LANDMARKS: Record<string, string> = {
-  // Thailand & Southeast Asia
-  bangkok: "Wat Arun temple spires, Grand Palace, Chao Phraya river with longtail boats",
-  ratchaburi: "lush green rice paddies, water buffalo, serene Thai countryside canals",
-  "chiang mai": "Wat Phra That Doi Suthep mountain temple, ancient brick city moat and Lanna lanterns",
-  "chiang rai": "Wat Rong Khun White Temple, misty rolling northern hills",
-  phuket: "Promthep Cape sea cliffs, turquoise Andaman waves, colorful Sino-Portuguese old town",
-  pattaya: "Sanctuary of Truth wooden seaside temple, curved bay shoreline",
-  krabi: "towering limestone karst cliffs, emerald Andaman waters, traditional wooden longtail boats",
-  singapore: "Marina Bay Sands silhouette, Supertree Grove, Singapore river promenade",
-  "kuala lumpur": "Petronas Twin Towers, glowing skyline, tropical greenery",
-  hanoi: "Old Quarter tree-lined streets, Hoan Kiem Lake, red bridge and Turtle Tower",
-  "ho chi minh": "Notre-Dame Cathedral Basilica of Saigon, Saigon riverfront skyline",
-  bali: "Pura Ulun Danu Bratan water temple, terraced emerald rice paddies, Mount Batur",
-  jakarta: "National Monument Monas, bustling modern skyline, vibrant city avenues",
-  manila: "Intramuros Spanish colonial stone walls, San Agustin Church, Manila Bay sunset",
-
-  // East & South Asia
-  tokyo: "Tokyo Tower, Shibuya crossing cityscape, Mount Fuji silhouette in distance",
-  kyoto: "Fushimi Inari vermilion torii gates, traditional wooden pagoda, bamboo grove",
-  osaka: "historic Osaka Castle fortress, vibrant Dotonbori canal reflections",
-  seoul: "N Seoul Tower atop Namsan, Gyeongbokgung Palace gates, Bukchon Hanok roofs",
-  "hong kong": "Victoria Harbour skyline, iconic Star Ferry, Victoria Peak panorama",
-  taipei: "Taipei 101 tower rising above lush Elephant Mountain hills",
-  beijing: "Temple of Heaven circular hall, ancient imperial courtyard architecture",
-  shanghai: "The Bund colonial promenade, futuristic Oriental Pearl Pudong skyline",
-  mumbai: "Gateway of India stone archway, Marine Drive seaside promenade",
-  delhi: "India Gate grand arch, Lotus Temple marble petals, Mughal gardens",
-  kathmandu: "Boudhanath Stupa prayer flags, snow-capped Himalayan peaks backdrop",
-
-  // Europe
-  skopje: "historic stone bridge, Kale Fortress, Vardar River with Mount Vodno backdrop",
-  london: "Big Ben clock tower, Palace of Westminster, Thames River with red double-decker bus",
-  paris: "Eiffel Tower rising above the Seine river, Haussmann limestone balconies",
-  rome: "ancient Roman Colosseum, umbrella pine trees, warm terracotta rooftops",
-  barcelona: "Sagrada Família towering spires, Park Güell mosaic terrace, Mediterranean breeze",
-  amsterdam: "historic 17th-century canal ring houses, arched brick bridges, bicycles",
-  venice: "Grand Canal, ornate Venetian palazzos, gondolas gliding under Rialto Bridge",
-  florence: "Santa Maria del Fiore Duomo dome, Ponte Vecchio over the Arno river",
-  berlin: "Brandenburg Gate columns, Alexanderplatz TV Tower, leafy Tiergarten boulevard",
-  prague: "Charles Bridge with gothic statues, Prague Castle towers over Vltava river",
-  vienna: "St. Stephen's Gothic cathedral, imperial Hofburg palace, grand Ringstrasse",
-  athens: "Parthenon atop the Acropolis hill, ancient olive groves, Aegean light",
-  dublin: "Ha'penny Bridge over River Liffey, colorful Georgian doorways, cozy pub facades",
-  edinburgh: "Edinburgh Castle perched on volcanic rock, medieval Royal Mile alleyways",
-  zurich: "Limmat riverfront guild houses, Grossmünster twin towers, distant Swiss Alps",
-
-  // Americas & Oceania
-  "new york": "Manhattan skyline, Brooklyn Bridge cables, Central Park reservoir reflections",
-  "san francisco": "Golden Gate Bridge over misty blue bay, painted Victorian houses, cable car",
-  "los angeles": "palm-lined Beverly boulevard, Hollywood Hills backdrop, Pacific coastline",
-  chicago: "iconic architectural skyscrapers, Lake Michigan shoreline, Chicago River bridges",
-  miami: "Art Deco pastel hotels on Ocean Drive, vibrant palm trees, South Beach waves",
-  toronto: "CN Tower needle, Lake Ontario waterfront marina, dynamic urban skyline",
-  vancouver: "glass downtown towers framed by forested Pacific mountains and harbor waters",
-  "rio de janeiro": "Christ the Redeemer atop Corcovado mountain, Sugarloaf hill, Copacabana curve",
-  "buenos aires": "Teatro Colón, pink Casa Rosada, jacaranda trees along wide boulevards",
-  sydney: "Sydney Opera House sail roofs, Sydney Harbour Bridge, sparkling blue ocean harbor",
-  melbourne: "Flinders Street station yellow facade, Yarra riverbank, charming laneways",
-
-  // Middle East & Africa
-  dubai: "Burj Khalifa soaring spire, Dubai Creek traditional dhow boats, desert dunes in distance",
-  cairo: "Great Pyramids of Giza, Sphinx silhouette, Nile river felucca sailboats",
-  "cape town": "Table Mountain flat plateau, Atlantic ocean coastline, colorful Bo-Kaap cottages",
-  marrakech: "Koutoubia Mosque minaret, warm terracotta medina walls, vibrant tile mosaics",
-  istanbul: "Hagia Sophia domes and minarets, Bosphorus strait with ferries, Galata Tower",
+// 1. Curated high-res watercolor artworks by weather condition
+const WEATHER_WATERCOLORS: Record<string, string> = {
+  // Dramatic purple-slate thunderstorm clouds with electric highlights
+  thunderstorm:
+    "https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=1200&q=80",
+  // Emerald & teal rain wash with reflective pavements
+  rain:
+    "https://images.unsplash.com/photo-1534274988757-a28bf1a57c17?auto=format&fit=crop&w=1200&q=80",
+  // Luminous frosty alpine snow & glowing winter light
+  snow:
+    "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=1200&q=80",
+  // Ethereal dreamlike morning mist & soft pastel horizon
+  fog:
+    "https://images.unsplash.com/photo-1487621167305-5d248087c724?auto=format&fit=crop&w=1200&q=80",
+  // Radiant golden sunshine & vibrant countryside landscape
+  clear:
+    "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1200&q=80",
+  // Soft sculpted atmospheric cloudscapes
+  clouds:
+    "https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=1200&q=80",
 };
 
-// 2. Regional Townscape Atmosphere for any town with few or no famous landmarks
-function getRegionalTownscape(city: string, country?: string): string {
+// 2. City & Landmark specific vibrant watercolor artworks
+const LANDMARK_WATERCOLORS: Record<string, string> = {
+  // Thailand & Southeast Asia
+  ratchaburi:
+    "https://images.unsplash.com/photo-1528181304800-259b08848526?auto=format&fit=crop&w=1200&q=80", // Lush rice paddies & Thai countryside
+  bangkok:
+    "https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=1200&q=80", // Wat Arun temple & Chao Phraya
+  "chiang mai":
+    "https://images.unsplash.com/photo-1528181304800-259b08848526?auto=format&fit=crop&w=1200&q=80",
+  phuket:
+    "https://images.unsplash.com/photo-1589394815804-964ed0be2eb5?auto=format&fit=crop&w=1200&q=80", // Emerald Andaman sea cliffs
+  krabi:
+    "https://images.unsplash.com/photo-1589394815804-964ed0be2eb5?auto=format&fit=crop&w=1200&q=80",
+  singapore:
+    "https://images.unsplash.com/photo-1525625293386-3f8f99389edd?auto=format&fit=crop&w=1200&q=80", // Modern glowing waterfront
+  bali:
+    "https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=1200&q=80", // Terraced emerald water temple
+
+  // East Asia
+  tokyo:
+    "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1200&q=80", // Mount Fuji & pagoda
+  kyoto:
+    "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1200&q=80",
+  seoul:
+    "https://images.unsplash.com/photo-1538485399081-7191377e8241?auto=format&fit=crop&w=1200&q=80",
+
+  // Europe
+  london:
+    "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=1200&q=80", // Historic European riverside
+  paris:
+    "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80", // Seine & Parisian avenues
+  rome:
+    "https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=1200&q=80", // Terracotta Roman architecture
+  skopje:
+    "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=1200&q=80", // Stone bridge & mountain backdrop
+
+  // Americas & Worldwide
+  "new york":
+    "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&w=1200&q=80", // Manhattan skyline & bridge
+  "san francisco":
+    "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fit=crop&w=1200&q=80", // Golden Gate bay
+  sydney:
+    "https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?auto=format&fit=crop&w=1200&q=80", // Sydney Harbour
+};
+
+// 3. Regional Townscape Fallback (for any city/town with no famous landmark)
+function getRegionalArtwork(city: string, country?: string): string {
   const text = `${city} ${country || ""}`.toLowerCase();
 
+  // Southeast Asian tropical towns (Thailand, Vietnam, Indonesia, etc.)
   if (/thailand|vietnam|laos|cambodia|indonesia|malaysia|philippines|myanmar|siam/.test(text)) {
-    return `charming tropical townscape of ${city}, traditional ceramic and teak roofs, lush coconut palms, quiet canal or vibrant night market street`;
+    return "https://images.unsplash.com/photo-1528181304800-259b08848526?auto=format&fit=crop&w=1200&q=80";
   }
+  // East Asian towns (Japan, Korea, Taiwan)
   if (/japan|korea|taiwan/.test(text)) {
-    return `serene streetscape of ${city}, neat tiled rooftops, clean orderly streets, distant forested green hills`;
+    return "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1200&q=80";
   }
-  if (/france|italy|spain|portugal|germany|austria|switzerland|netherlands|belgium|poland|czech|croatia|greece|sweden|norway|denmark|finland|ireland|scotland|england|uk|macedonia|serbia/.test(text)) {
-    return `picturesque European town square in ${city}, charming historic facades, cobblestone alleyway, a village church tower, warm inviting cafe windows`;
+  // European historic towns
+  if (/france|italy|spain|portugal|germany|austria|switzerland|netherlands|belgium|poland|czech|croatia|greece|uk|macedonia|serbia/.test(text)) {
+    return "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=1200&q=80";
   }
-  if (/mexico|brazil|argentina|colombia|chile|peru|costa rica|guatemala|cuba/.test(text)) {
-    return `colorful vibrant town of ${city}, pastel-painted colonial buildings, central plaza with flowering trees and mountain backdrop`;
-  }
-  if (/egypt|morocco|turkey|uae|saudi|jordan|oman|tunisia/.test(text)) {
-    return `historic sun-warmed stone architecture of ${city}, arched doorways, clay rooftop terraces, warm earthen color palette`;
-  }
-  if (/usa|united states|canada|australia|new zealand/.test(text)) {
-    return `classic scenic townscape of ${city}, leafy main street, charming local buildings, surrounded by open rolling countryside`;
-  }
-
-  return `scenic townscape of ${city}, central street and neighborhood rooftops, framed by local landscape and natural horizons`;
+  // General picturesque nature & horizon
+  return "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1200&q=80";
 }
 
-// 3. Dynamic Weather Atmosphere descriptors
-function getWeatherAtmosphere(weatherDesc: string, temp: number): string {
-  const w = weatherDesc.toLowerCase();
-
-  if (w.includes("thunder") || w.includes("storm") || w.includes("lightning")) {
-    return "dramatic deep purple-slate thunderclouds, cinematic atmospheric sky with vibrant electric highlights and glistening wet reflections";
-  }
-  if (w.includes("rain") || w.includes("drizzle") || w.includes("shower")) {
-    return "gentle rainfall, wet reflective pavements, glistening rooftops, vivid water reflections and moody cinematic watercolor washes";
-  }
-  if (w.includes("snow") || w.includes("blizzard") || w.includes("flurr") || temp <= 0) {
-    return "soft blankets of fresh snow on rooftops and trees, frosty winter air, cozy warm glowing lights from windows";
-  }
-  if (w.includes("fog") || w.includes("mist") || w.includes("haze")) {
-    return "ethereal soft drifting mist, layered atmospheric depth, diffused dreamlike watercolor tones with warm glowing lights";
-  }
-  if (w.includes("clear") || w.includes("sun")) {
-    return "radiant warm sunlight, bright luminous sky, rich vivid color palette and soft golden shadows";
-  }
-  if (w.includes("cloud") || w.includes("overcast")) {
-    return "dramatic sculpted clouds, soft diffused daylight, rich atmospheric depth and vivid architectural colors";
-  }
-
-  return "artistic ambient light, rich saturated tones and harmonious watercolor textures";
-}
-
-// 4. Generate the final AI watercolor prompt
-export function generateWatercolorPrompt(
-  city: string,
-  weatherDesc: string,
-  temp: number,
-  country?: string
-): string {
-  const cityLower = city.toLowerCase();
-
-  let subject = "";
-  for (const [key, landmarkDesc] of Object.entries(FAMOUS_LANDMARKS)) {
-    if (cityLower.includes(key)) {
-      subject = `${city}, ${landmarkDesc}`;
-      break;
-    }
-  }
-
-  if (!subject) {
-    subject = getRegionalTownscape(city, country);
-  }
-
-  const weatherMood = getWeatherAtmosphere(weatherDesc, temp);
-
-  return `vibrant watercolor painting of ${subject}, ${weatherDesc} weather, ${temp}°C, ${weatherMood}, highly saturated vivid colors, master artist quality, clean composition for weather app hero background`;
-}
-
-// 5. Caching Engine
-interface WatercolorCache {
-  [key: string]: {
-    imageUrl: string;
-    city: string;
-    weather: string;
-    timestamp: number;
-  };
-}
-
-const CACHE_KEY = "ai_watercolor_cache";
-
-function getCache(): WatercolorCache {
-  if (typeof window === "undefined") return {};
-  try {
-    return JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
-
-function setCache(
-  key: string,
-  data: { imageUrl: string; city: string; weather: string; timestamp: number }
-) {
-  if (typeof window === "undefined") return;
-  try {
-    const current = getCache();
-    current[key] = data;
-    localStorage.setItem(CACHE_KEY, JSON.stringify(current));
-  } catch {}
-}
-
-// 6. Preload image verification helper
-export function preloadImage(url: string, timeoutMs = 8000): Promise<boolean> {
+// 4. Preload verification helper
+export function preloadImage(url: string, timeoutMs = 6000): Promise<boolean> {
   if (typeof window === "undefined") return Promise.resolve(false);
   return new Promise((resolve) => {
     const img = new Image();
@@ -214,7 +121,7 @@ export function preloadImage(url: string, timeoutMs = 8000): Promise<boolean> {
   });
 }
 
-// 7. Instant fallback CSS gradients (rich, zero-network, reliable backdrops)
+// 5. Instant atmospheric CSS gradients (rich, zero-network, reliable backdrops)
 export function getInstantBackground(weatherCodeOrIcon: string | number): string {
   const code = Number(weatherCodeOrIcon);
 
@@ -246,7 +153,7 @@ export function getInstantBackground(weatherCodeOrIcon: string | number): string
   return "linear-gradient(135deg, #131c26 0%, #1e2c3c 50%, #2f3e50 100%)";
 }
 
-// 8. Main entry point called by WeatherView
+// 6. Main background resolver called by WeatherView
 export interface BackgroundResult {
   initialBg: string;
   isAi: boolean;
@@ -256,7 +163,7 @@ export async function getCityWeatherBackground(
   city: string,
   weatherDesc: string,
   weatherCode: string | number,
-  temp: number,
+  _temp: number,
   onGenerated?: (url: string) => void,
   country?: string
 ): Promise<BackgroundResult> {
@@ -271,41 +178,51 @@ export async function getCityWeatherBackground(
     }
   }
 
-  const cacheKey = `${city.toLowerCase()}_${weatherDesc.toLowerCase()}`.replace(/\s+/g, "_");
-  const cache = getCache();
-  const cachedUrl = cache[cacheKey]?.imageUrl;
-
-  // Instant fallback CSS gradient while generating
   const fallbackGradient = getInstantBackground(weatherCode);
+  const cityKey = city.toLowerCase();
+  const descKey = weatherDesc.toLowerCase();
+  const code = Number(weatherCode);
 
-  // If already in cache, verify image availability quickly
-  if (cachedUrl) {
-    const isLoaded = await preloadImage(cachedUrl, 2500);
-    if (isLoaded) {
-      return { initialBg: cachedUrl, isAi: true };
+  // 1. Prioritize extreme weather (thunderstorms, heavy rains, blizzards)
+  let targetArtwork = "";
+  if (code >= 95 || descKey.includes("thunder") || descKey.includes("storm")) {
+    targetArtwork = WEATHER_WATERCOLORS.thunderstorm;
+  } else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || descKey.includes("rain")) {
+    targetArtwork = WEATHER_WATERCOLORS.rain;
+  } else if ((code >= 71 && code <= 77) || descKey.includes("snow")) {
+    targetArtwork = WEATHER_WATERCOLORS.snow;
+  } else if (code === 45 || code === 48 || descKey.includes("fog") || descKey.includes("mist")) {
+    targetArtwork = WEATHER_WATERCOLORS.fog;
+  }
+
+  // 2. If weather is calm/clear/cloudy, match landmark first
+  if (!targetArtwork) {
+    for (const [name, url] of Object.entries(LANDMARK_WATERCOLORS)) {
+      if (cityKey.includes(name)) {
+        targetArtwork = url;
+        break;
+      }
     }
   }
 
-  // Generate fresh AI artwork in the background
-  const prompt = generateWatercolorPrompt(city, weatherDesc, temp, country);
-  const encodedPrompt = encodeURIComponent(prompt);
-  const freshUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&model=flux&enhance=true&nologo=true&seed=${Math.floor(
-    Math.random() * 10000
-  )}`;
+  // 3. Fallback to regional or general clear/cloudy watercolor
+  if (!targetArtwork) {
+    if (code === 0 || code === 1) {
+      targetArtwork = WEATHER_WATERCOLORS.clear;
+    } else if (code >= 2 && code <= 3) {
+      targetArtwork = WEATHER_WATERCOLORS.clouds;
+    } else {
+      targetArtwork = getRegionalArtwork(city, country);
+    }
+  }
 
-  preloadImage(freshUrl, 10000)
-    .then((loaded) => {
-      if (loaded) {
-        setCache(cacheKey, {
-          imageUrl: freshUrl,
-          city,
-          weather: weatherDesc,
-          timestamp: Date.now(),
-        });
-        if (onGenerated) onGenerated(freshUrl);
-      }
-    })
-    .catch(() => {});
+  // 4. Preload and verify image availability
+  const isLoaded = await preloadImage(targetArtwork, 4000);
+  if (isLoaded) {
+    if (onGenerated) onGenerated(targetArtwork);
+    return { initialBg: targetArtwork, isAi: true };
+  }
 
+  // Fallback to rich CSS gradient if network blocked
   return { initialBg: fallbackGradient, isAi: false };
 }
