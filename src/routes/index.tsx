@@ -1,4 +1,5 @@
 import { AppMenu } from "@/components/AppMenu";
+import { WeatherView } from "@/components/WeatherView";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -945,7 +946,6 @@ function Index() {
   );
 }
 
-function WeatherView({
   w,
   disasters,
   refreshing,
