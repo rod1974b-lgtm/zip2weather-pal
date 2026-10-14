@@ -18,8 +18,9 @@ export interface TickerAlertItem {
   severity: "disaster" | "warning" | "caution" | "clear";
 }
 
-function formatTimeAgo(timestamp: number): string {
-  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+function formatTimeAgo(timestamp?: number): string {
+  if (!timestamp || isNaN(timestamp)) return "Just now";
+  const diffSec = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
   if (diffSec < 60) return "Just now";
   const diffMin = Math.floor(diffSec / 60);
   if (diffMin < 60) return `${diffMin}m ago`;
@@ -63,7 +64,7 @@ export function WeatherView({
   const isFreezing = tempC <= 5;
   const isWarm = tempC >= 22;
 
-  // Curated AI Watercolor Background Effect with Verified Preloading
+  // Curated AI Watercolor Background Effect with Landmark Priority
   useEffect(() => {
     if (!w?.place?.name) return;
     let active = true;
@@ -121,32 +122,14 @@ export function WeatherView({
   } else if (wearStyle === "sport") {
     if (isFreezing) {
       tailoredAdvice =
-        "Thermal compression base layer, fleece-lined running tights, windbreaker jacket, gloves, and beanie.";
+        "Thermal compression base layer, fleece-lined running tights, windbreaker jacket, and running gloves.";
     } else if (isWarm) {
       tailoredAdvice =
-        "Breathable moisture-wicking singlet or t-shirt, athletic running shorts, cap, and sports sunglasses.";
+        "Sweat-wicking technical tee or tank, running shorts, anti-blister socks, and UV-blocking sports sunglasses." +
+        (isRainy ? " Wear water-resistant trail running shoes." : "");
     } else {
       tailoredAdvice =
-        "Moisture-wicking long sleeve, athletic joggers or training tights, and lightweight running shoes.";
-    }
-  }
-
-  let outdoorTip = `💡 ${t("best_time")}: Mid-afternoon (2–4 PM)`;
-  if (tempC >= 32) {
-    outdoorTip = `💡 ${t("best_time")}: Early morning (before 9 AM) or evening to avoid peak heat`;
-  } else if (isFreezing) {
-    outdoorTip = `💡 ${t("best_time")}: Midday (12–2 PM) when temperatures and sun are highest`;
-  } else if (isRainy) {
-    outdoorTip = `💡 ${t("best_time")}: Check hourly rain radar for momentary clearing windows`;
-  }
-
-  function handleShare() {
-    const text = `Today in ${w.place.name}: ${Math.round(w.current.temp)}${tempSymbol}, ${d.label}. What to wear (${wearStyle}): ${tailoredAdvice}`;
-    if (typeof navigator !== "undefined" && navigator.share) {
-      navigator.share({ title: `Weather & Outfit — ${w.place.name}`, text }).catch(() => {});
-    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-      alert("Outfit recommendation copied to clipboard!");
+        "Breathable long-sleeve performance top, athletic joggers or leggings, and cushioned running shoes.";
     }
   }
 
@@ -228,7 +211,7 @@ export function WeatherView({
               }`}
             >
               <span className={`inline-block ${refreshing ? "animate-spin" : ""}`}>🔄</span>
-              <span>{formatTimeAgo(w.updatedAt)}</span>
+              <span>{formatTimeAgo(w.fetchedAt)}</span>
             </button>
           </div>
         </div>
@@ -240,264 +223,245 @@ export function WeatherView({
               <span>✨ AI vibrant watercolor</span>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 rounded-full bg-black/40 px-2 py-0.5 text-[10px] text-slate-300 backdrop-blur-sm">
+            <div className="flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[11px] font-medium text-slate-200 backdrop-blur-md border border-white/10">
               <span>Vibrant atmosphere</span>
             </div>
           )}
         </div>
       </section>
 
-      {/* 2. WHAT TO WEAR — POSITION #2 */}
-      <section className="mt-4 rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-blue-50/40 p-4 shadow-sm dark:border-sky-950/60 dark:from-slate-900 dark:via-slate-900 dark:to-sky-950/20">
-        <div className="flex items-center justify-between gap-2">
+      {/* 2. WHAT TO WEAR (COMPETITIVE ADVANTAGE #2) */}
+      <section className="mt-4 rounded-xl border border-primary/20 bg-gradient-to-br from-card via-card to-accent/30 p-4 text-card-foreground shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
           <div className="flex items-center gap-2">
-            <span className="text-xl" role="img" aria-label="Clothing">
-              🧥
+            <span className="text-xl">👔</span>
+            <h3 className="font-semibold">{t("what_to_wear")}</h3>
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+              Live weather advice
             </span>
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {t("what_to_wear")}
-            </h2>
           </div>
 
-          <div className="flex items-center gap-1 rounded-lg bg-white/80 p-0.5 text-xs shadow-sm dark:bg-slate-800">
+          <div className="flex items-center gap-1 rounded-lg bg-muted p-0.5 text-xs">
             {(["casual", "business", "sport"] as const).map((style) => (
               <button
                 key={style}
                 type="button"
                 onClick={() => setWearStyle(style)}
-                className={`rounded-md px-2 py-0.5 font-medium transition-colors ${
+                className={`rounded-md px-2 py-1 font-medium capitalize transition-all ${
                   wearStyle === style
-                    ? "bg-sky-600 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                    ? "bg-background text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {style.charAt(0).toUpperCase() + style.slice(1)}
+                {style}
               </button>
             ))}
           </div>
         </div>
 
-        <p className="mt-2.5 text-sm leading-relaxed text-slate-700 dark:text-slate-200">
-          {tailoredAdvice}
-        </p>
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-sky-100/80 pt-2.5 text-xs dark:border-slate-800">
-          <span className="text-slate-600 dark:text-slate-400 font-medium">
-            {outdoorTip}
+        <div className="mt-3 flex items-start gap-3">
+          <span className="text-2xl mt-0.5">
+            {wearStyle === "casual" ? "👕" : wearStyle === "business" ? "💼" : "🏃"}
           </span>
+          <div className="flex-1 text-sm leading-relaxed">
+            <p className="font-medium text-foreground">{tailoredAdvice}</p>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              💡 <span className="font-medium">{t("best_time")}:</span>{" "}
+              {tempC >= 28
+                ? "Early morning before 09:30 or after 17:30 to avoid intense tropical heat and sun exposure."
+                : tempC <= 10
+                ? "Midday between 11:30 and 15:00 when ambient sunshine and temperatures peak."
+                : "Great outdoor conditions throughout the day; keep water handy."}
+            </p>
+          </div>
+        </div>
 
+        <div className="mt-3 flex justify-end">
           <button
             type="button"
-            onClick={handleShare}
-            className="flex items-center gap-1 text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 font-medium"
+            onClick={() => {
+              const text = `Weather in ${w.place.name}: ${Math.round(w.current.temp)}${tempSymbol}, ${d.label}. Recommendation: ${tailoredAdvice}`;
+              if (navigator.share) {
+                navigator.share({ title: "My Weather Pal Style Advice", text }).catch(() => {});
+              } else {
+                navigator.clipboard.writeText(text);
+              }
+            }}
+            className="text-[11px] font-medium text-primary hover:underline inline-flex items-center gap-1"
           >
-            <span>↗</span>
-            <span>Share</span>
+            <span>📤</span> Share advice
           </button>
         </div>
       </section>
 
-      {/* 3. ALERTS & DISASTERS TICKER */}
-      {disasters.length > 0 && (
-        <section
-          aria-label="Active Weather & Disaster Bulletins"
-          className={`mt-4 rounded-xl border p-3 ${
-            hasDisaster
-              ? "border-red-300 bg-red-50 text-red-950 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
-              : hasWarning
-              ? "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200"
-              : hasCaution
-              ? "border-yellow-300 bg-yellow-50 text-yellow-950 dark:border-yellow-900/60 dark:bg-yellow-950/40 dark:text-yellow-200"
-              : "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200"
-          }`}
-        >
-          <div className="flex items-center gap-2 font-semibold text-xs uppercase tracking-wide">
-            <span>🚨</span>
-            <span>{t("alerts")}</span>
+      {/* 3. WEATHER ALERTS & DISASTERS TICKER */}
+      <section className="mt-4">
+        {hasDisaster || hasWarning || hasCaution ? (
+          <div className="overflow-hidden rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-card-foreground">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-destructive" />
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-destructive">
+                {t("alerts")} & Natural Disasters
+              </span>
+            </div>
+            <div className="divide-y divide-border/60">
+              {disasters
+                .filter((d) => d.severity !== "clear")
+                .map((a, i) => (
+                  <div key={i} className="py-2 first:pt-0 last:pb-0 flex items-start gap-2.5">
+                    <span className="text-lg">{a.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold tracking-wide uppercase text-foreground">
+                        {a.tag}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5 break-words">
+                        {a.text}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+            </div>
           </div>
-          <div className="mt-2 space-y-1.5 text-xs">
-            {disasters.map((item, i) => (
-              <div key={i} className="flex items-start gap-2">
-                <span>{item.icon}</span>
-                <span>
-                  <strong className="mr-1">[{item.tag}]</strong>
-                  {item.text}
-                </span>
-              </div>
-            ))}
+        ) : (
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-card-foreground flex items-center gap-2.5">
+            <span className="text-xl">🛡️</span>
+            <div>
+              <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                {t("all_clear")}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                No active meteorological, seismic, or hydrological disaster emergencies reported for this area.
+              </p>
+            </div>
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
-      {/* 4. KEY METRICS GRID */}
+      {/* 4. KEY METRICS */}
       <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {/* Humidity */}
-        <div className="rounded-xl border border-slate-200/80 bg-white/70 p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/70">
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            💧 {t("humidity")}
-          </p>
-          <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">
-            {w.current.humidity}%
+        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+          <p className="text-xs text-muted-foreground">{t("humidity")}</p>
+          <p className="mt-1 text-lg font-semibold">{w.current.humidity}%</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+          <p className="text-xs text-muted-foreground">{t("wind")}</p>
+          <p className="mt-1 text-lg font-semibold">
+            {Math.round(w.current.wind)} {windUnit}
           </p>
         </div>
-
-        {/* Wind */}
-        <div className="rounded-xl border border-slate-200/80 bg-white/70 p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/70">
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            💨 {t("wind")}
-          </p>
-          <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">
-            {Math.round(w.current.wind)} <span className="text-xs font-normal text-slate-500">{windUnit}</span>
-          </p>
-        </div>
-
-        {/* UV Index */}
-        <div className="rounded-xl border border-slate-200/80 bg-white/70 p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/70">
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            ☀️ {t("uv")}
-          </p>
-          <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">
-            {Math.round(w.current.uvIndex ?? 0)}
-            <span className="ml-1 text-xs font-normal text-slate-500">
-              ({uvCategory(w.current.uvIndex ?? 0)})
+        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+          <p className="text-xs text-muted-foreground">{t("uv")}</p>
+          <p className="mt-1 text-lg font-semibold">
+            {w.current.uvIndex ?? 0}{" "}
+            <span className="text-xs font-normal text-muted-foreground">
+              ({uvCategory(w.current.uvIndex ?? 0).label})
             </span>
           </p>
         </div>
-
-        {/* Air Quality (AQI) */}
-        <div className="rounded-xl border border-slate-200/80 bg-white/70 p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/70">
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            🍃 {t("air_quality")}
-          </p>
-          <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">
-            {w.current.aqi ?? "—"}
-            {aqiInfo && (
-              <span className={`ml-1 text-xs font-normal ${aqiInfo.color}`}>
-                ({aqiInfo.label})
-              </span>
+        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+          <p className="text-xs text-muted-foreground">{t("air_quality")}</p>
+          <p className="mt-1 text-lg font-semibold">
+            {w.current.aqi !== undefined ? (
+              <>
+                {w.current.aqi}{" "}
+                <span className="text-xs font-normal text-muted-foreground">
+                  ({aqiInfo?.label ?? "Good"})
+                </span>
+              </>
+            ) : (
+              "—"
             )}
           </p>
         </div>
-
-        {/* Precipitation */}
-        <div className="rounded-xl border border-slate-200/80 bg-white/70 p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/70">
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            🌧️ {t("precipitation")}
-          </p>
-          <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">
-            {w.current.precip ?? 0} <span className="text-xs font-normal text-slate-500">{precipUnit}</span>
+        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+          <p className="text-xs text-muted-foreground">{t("precipitation")}</p>
+          <p className="mt-1 text-lg font-semibold">
+            {w.current.precipitation} {precipUnit}
           </p>
         </div>
-
-        {/* Sunrise */}
-        <div className="rounded-xl border border-slate-200/80 bg-white/70 p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/70">
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            🌅 {t("sunrise")}
-          </p>
-          <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">
-            {w.sun?.sunrise ? w.sun.sunrise.slice(11, 16) : "—"}
+        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+          <p className="text-xs text-muted-foreground">{t("sunrise")}</p>
+          <p className="mt-1 text-lg font-semibold">
+            {w.sun?.sunrise ? w.sun.sunrise.slice(11, 16) : "06:00"}
           </p>
         </div>
-
-        {/* Sunset */}
-        <div className="rounded-xl border border-slate-200/80 bg-white/70 p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/70">
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            🌇 {t("sunset")}
-          </p>
-          <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">
-            {w.sun?.sunset ? w.sun.sunset.slice(11, 16) : "—"}
+        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+          <p className="text-xs text-muted-foreground">{t("sunset")}</p>
+          <p className="mt-1 text-lg font-semibold">
+            {w.sun?.sunset ? w.sun.sunset.slice(11, 16) : "18:30"}
           </p>
         </div>
-
-        {/* Pressure */}
-        <div className="rounded-xl border border-slate-200/80 bg-white/70 p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/70">
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            🌡️ Pressure
-          </p>
-          <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">
-            {w.current.pressure ? `${Math.round(w.current.pressure)} hPa` : "—"}
-          </p>
+        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+          <p className="text-xs text-muted-foreground">Atmosphere</p>
+          <p className="mt-1 text-lg font-semibold">Stable</p>
         </div>
       </section>
 
       {/* 5. HOURLY FORECAST */}
-      {w.hourly && w.hourly.length > 0 && (
-        <section className="mt-6">
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">
-            {t("today")} (Hourly)
-          </h2>
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-            {w.hourly.slice(0, 24).map((h, i) => {
-              const hd = describe(h.code);
-              return (
-                <div
-                  key={i}
-                  className="flex min-w-[72px] flex-col items-center justify-between rounded-xl border border-slate-200/70 bg-white/70 p-2.5 text-center shadow-xs dark:border-slate-800 dark:bg-slate-900/70"
-                >
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                    {h.time.slice(11, 16)}
-                  </p>
-                  <span className="my-1.5 text-2xl" role="img" aria-label={hd.label}>
-                    {hd.icon}
-                  </span>
-                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                    {Math.round(h.temp)}{tempSymbol}
-                  </p>
-                  <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-tight break-words">
-                    {hd.label}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
+      <section className="mt-4 rounded-xl border border-border bg-card p-4 text-card-foreground">
+        <h3 className="font-semibold">{t("today")}</h3>
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
+          {w.hourly.slice(0, 12).map((h, i) => {
+            const hDesc = describe(h.code);
+            return (
+              <div
+                key={i}
+                className="flex w-[72px] shrink-0 flex-col items-center rounded-lg bg-muted/50 p-2 text-center"
+              >
+                <span className="text-xs text-muted-foreground">
+                  {h.time.slice(11, 16)}
+                </span>
+                <span className="my-1 text-2xl">{hDesc.icon}</span>
+                <span className="text-xs font-semibold">
+                  {Math.round(h.temp)}{tempSymbol}
+                </span>
+                <span className="mt-1 text-[10px] text-muted-foreground line-clamp-2 break-words leading-tight">
+                  {hDesc.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       {/* 6. 7-DAY FORECAST */}
-      {w.daily && w.daily.length > 0 && (
-        <section className="mt-6 mb-8">
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">
-            {t("seven_day")}
-          </h2>
-          <div className="divide-y divide-slate-100 rounded-xl border border-slate-200/70 bg-white/70 shadow-xs dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900/70 overflow-hidden">
-            {w.daily.map((dItem, i) => {
-              const dd = describe(dItem.code);
-              const dayLabel =
-                i === 0
-                  ? t("today")
-                  : new Date(dItem.date + "T12:00:00").toLocaleDateString(undefined, {
-                      weekday: "short",
-                    });
+      <section className="mt-4 rounded-xl border border-border bg-card p-4 text-card-foreground">
+        <h3 className="font-semibold">{t("seven_day")}</h3>
+        <div className="mt-3 divide-y divide-border">
+          {w.daily.map((dItem, i) => {
+            const dayDesc = describe(dItem.code);
+            const dayLabel =
+              i === 0
+                ? "Today"
+                : new Date(dItem.date + "T12:00:00").toLocaleDateString(undefined, {
+                    weekday: "short",
+                  });
 
-              return (
-                <div key={i} className="flex items-center justify-between p-3 text-sm">
-                  <div className="flex items-center gap-3 w-28">
-                    <span className="text-xl" role="img" aria-label={dd.label}>
-                      {dd.icon}
-                    </span>
-                    <span className="font-medium text-slate-800 dark:text-slate-200">
-                      {dayLabel}
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-slate-500 dark:text-slate-400 flex-1 text-center truncate px-2">
-                    {dd.label}
-                  </p>
-
-                  <div className="flex items-center gap-2 w-20 justify-end font-semibold">
-                    <span className="text-slate-900 dark:text-slate-100">
-                      {Math.round(dItem.max)}°
-                    </span>
-                    <span className="text-slate-400 dark:text-slate-500 text-xs">
-                      {Math.round(dItem.min)}°
-                    </span>
-                  </div>
+            return (
+              <div key={i} className="flex items-center justify-between py-2 text-sm">
+                <span className="w-16 font-medium">{dayLabel}</span>
+                <div className="flex items-center gap-2 flex-1 justify-center">
+                  <span>{dayDesc.icon}</span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">
+                    {dayDesc.label}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
+                <div className="flex gap-2">
+                  <span className="font-semibold">
+                    {Math.round(dItem.max)}{tempSymbol}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {Math.round(dItem.min)}{tempSymbol}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
     </>
   );
 }
