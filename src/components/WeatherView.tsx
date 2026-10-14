@@ -63,7 +63,7 @@ export function WeatherView({
   const isFreezing = tempC <= 5;
   const isWarm = tempC >= 22;
 
-  // AI Watercolor Background Effect with Spinner & Badge State
+  // AI Watercolor Background Effect with Verified Preloading
   useEffect(() => {
     if (!w?.place?.name) return;
     let active = true;
@@ -77,25 +77,19 @@ export function WeatherView({
       w.current.code,
       Math.round(tempC),
       (aiUrl) => {
-        if (active) {
+        if (active && aiUrl) {
           setHeroBg(aiUrl);
           setIsAiGenerated(true);
           setIsGenerating(false);
         }
-      }
+      },
+      w.place.country
     )
-      .then((instant) => {
+      .then(({ initialBg, isAi }) => {
         if (!active) return;
-        if (instant) setHeroBg(instant);
-        try {
-          const cache = JSON.parse(localStorage.getItem("ai_watercolor_cache") || "{}");
-          const cacheKey = `${w.place.name.toLowerCase()}_${d.label.toLowerCase()}`.replace(/\s+/g, "_");
-          const isCached = Boolean(cache[cacheKey]?.imageUrl);
-          setIsAiGenerated(isCached);
-          if (isCached) {
-            setIsGenerating(false);
-          }
-        } catch {
+        setHeroBg(initialBg);
+        setIsAiGenerated(isAi);
+        if (isAi) {
           setIsGenerating(false);
         }
       })
@@ -106,7 +100,7 @@ export function WeatherView({
     return () => {
       active = false;
     };
-  }, [w.place.name, w.current.code, w.current.temp, w.unit, d.label, tempC]);
+  }, [w.place.name, w.place.country, w.current.code, w.current.temp, w.unit, d.label, tempC]);
 
   const hasDisaster = disasters.some((a) => a.severity === "disaster");
   const hasWarning = disasters.some((a) => a.severity === "warning");
@@ -120,22 +114,23 @@ export function WeatherView({
         (isRainy ? " Carry a classic dark umbrella." : "");
     } else if (isWarm) {
       tailoredAdvice =
-        "Breathable linen shirt or blouse, lightweight slacks or pencil skirt, loafers." +
-        (w.current.uvIndex >= 6 ? " Add UV-rated sunglasses." : "");
+        "Lightweight linen or breathable cotton dress shirt, tailored chinos, loafers, and sunglasses." +
+        (isRainy ? " Keep a compact umbrella handy." : "");
     } else {
-      tailoredAdvice = "Structured blazer, crisp button-down, chinos or tailored trousers, and dress shoes.";
+      tailoredAdvice =
+        "Structured blazer, crisp collared shirt, tailored trousers, and dress shoes." +
+        (isRainy ? " Bring an umbrella." : "");
     }
   } else if (wearStyle === "sport") {
     if (isFreezing) {
       tailoredAdvice =
-        "Thermal compression base layer, windbreaker running jacket, gloves, and fleece-lined tights." +
-        (isRainy ? " Water-repellent trail runners." : "");
+        "Thermal compression base layer, fleece-lined running tights, windbreaker jacket, gloves, and beanie.";
     } else if (isWarm) {
       tailoredAdvice =
-        "Moisture-wicking mesh tee, lightweight shorts, running cap, and plenty of hydration." +
-        (w.current.uvIndex >= 6 ? " Sweatproof sunscreen." : "");
+        "Breathable moisture-wicking singlet or t-shirt, athletic running shorts, cap, and sports sunglasses.";
     } else {
-      tailoredAdvice = "Breathable athletic layers, moisture-wicking hoodie or track jacket, and supportive trainers.";
+      tailoredAdvice =
+        "Moisture-wicking long sleeve, athletic joggers or training tights, and lightweight running shoes.";
     }
   }
 
@@ -158,22 +153,29 @@ export function WeatherView({
     }
   }
 
+  const isGradient = heroBg.startsWith("linear-gradient");
+  const bgStyle = heroBg
+    ? isGradient
+      ? { backgroundImage: heroBg }
+      : {
+          backgroundImage: `url("${heroBg}")`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }
+    : undefined;
+
   return (
     <>
       {/* 1. HERO CARD WITH AI VIBRANT WATERCOLOR, SPINNER & BADGE */}
       <section
         className="relative mt-4 overflow-hidden rounded-2xl p-6 text-white shadow-lg transition-all duration-700 bg-slate-900 min-h-[190px]"
-        style={{
-          backgroundImage: heroBg ? `url(${heroBg})` : undefined,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
+        style={bgStyle}
       >
-        <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]" />
+        <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" />
 
         {/* Spinner while AI generates art */}
         {isGenerating && (
-          <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-md shadow-sm">
+          <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-md shadow-sm">
             <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
             <span>Generating vibrant art…</span>
           </div>
@@ -197,6 +199,7 @@ export function WeatherView({
                   {isFav ? "★" : "☆"}
                 </button>
               </div>
+
               <div className="mt-2 flex items-center gap-4">
                 <span className="text-6xl drop-shadow-md" role="img" aria-label={d.label}>
                   {d.icon}
@@ -233,7 +236,7 @@ export function WeatherView({
           </div>
         </div>
 
-        {/* ✨ AI badge - bottom right */}
+        {/* AI badge - bottom right */}
         <div className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 pointer-events-none">
           {isAiGenerated ? (
             <div className="flex items-center gap-1 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-2.5 py-1 text-[10px] font-semibold text-white shadow-md">
@@ -242,7 +245,7 @@ export function WeatherView({
             </div>
           ) : (
             <div className="rounded-full bg-black/40 px-2.5 py-1 text-[10px] text-white/80 backdrop-blur-sm">
-              Vibrant background
+              Vibrant atmosphere
             </div>
           )}
         </div>
@@ -258,194 +261,161 @@ export function WeatherView({
           <button
             type="button"
             onClick={handleShare}
-            className="flex items-center gap-1 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-card-foreground hover:bg-accent transition-colors"
-            title="Share outfit advice"
+            className="flex items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent transition-colors"
           >
             <span>↗</span>
             <span>Share</span>
           </button>
         </div>
 
-        <p className="mt-2.5 text-xs leading-relaxed text-card-foreground">
-          {tailoredAdvice}
-        </p>
-
-        <div className="mt-3 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setWearStyle("casual")}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              wearStyle === "casual"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "border border-input bg-muted/30 text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Casual
-          </button>
-          <button
-            type="button"
-            onClick={() => setWearStyle("business")}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              wearStyle === "business"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "border border-input bg-muted/30 text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Business
-          </button>
-          <button
-            type="button"
-            onClick={() => setWearStyle("sport")}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              wearStyle === "sport"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "border border-input bg-muted/30 text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Sport
-          </button>
+        <div className="mt-3 flex gap-1.5">
+          {(["casual", "business", "sport"] as const).map((style) => (
+            <button
+              key={style}
+              type="button"
+              onClick={() => setWearStyle(style)}
+              className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${
+                wearStyle === style
+                  ? "bg-primary text-primary-foreground shadow-xs"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              {style}
+            </button>
+          ))}
         </div>
 
-        <div className="mt-3 rounded-lg bg-amber-500/10 border border-amber-500/20 p-2 text-[11px] leading-relaxed text-amber-900 dark:text-amber-200">
+        <p className="mt-3 text-sm text-foreground leading-relaxed">{tailoredAdvice}</p>
+
+        <div className="mt-3 rounded-lg border border-amber-200/60 bg-amber-50/70 p-2.5 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200">
           {outdoorTip}
         </div>
       </section>
 
-      {/* 3. ALERTS TICKER / ALL CLEAR BANNER */}
-      {!hasDisaster && !hasWarning && !hasCaution ? (
-        <div className="mt-3 flex w-full min-h-[56px] flex-wrap items-center overflow-visible rounded-lg bg-green-500 px-3 py-2 text-xs shadow-2xs">
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-medium leading-[18px] text-white break-words whitespace-normal">
-              All clear - No severe weather expected in your area today. Enjoy your day!
-            </div>
+      {/* 3. ALERTS TICKER */}
+      {disasters.length === 0 ? (
+        <section
+          aria-label="Disaster & Weather Status"
+          className="mt-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-2.5 text-emerald-900 dark:text-emerald-200"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base">🛡️</span>
+            <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+              {t("all_clear")}
+            </span>
+            <span className="text-xs font-medium leading-tight">
+              No earthquakes, floods, or weather emergencies detected in this region.
+            </span>
           </div>
-        </div>
+        </section>
       ) : (
-        <div
-          className={`mt-3 overflow-hidden rounded-xl border text-xs shadow-2xs ${
+        <section
+          aria-label="Active Disaster & Weather Advisories"
+          className={`mt-3 overflow-hidden rounded-xl border text-xs shadow-xs ${
             hasDisaster
-              ? "border-red-600/60 bg-red-600/15 text-red-950 dark:text-red-200"
+              ? "border-red-600 bg-red-600/15 text-red-950 dark:text-red-100"
               : hasWarning
-              ? "border-red-500/40 bg-red-500/10 text-red-950 dark:text-red-200"
-              : "border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-200"
+              ? "border-amber-500/70 bg-amber-500/15 text-amber-950 dark:text-amber-100"
+              : "border-sky-500/60 bg-sky-500/15 text-sky-950 dark:text-sky-100"
           }`}
         >
-          <div className="flex items-center">
-            <div
-              className={`flex shrink-0 items-center gap-1.5 border-r px-3 py-2 text-[11px] font-bold uppercase tracking-wider ${
-                hasDisaster
-                  ? "border-red-600/40 bg-red-600/25 text-red-700 dark:text-red-300"
-                  : hasWarning
-                  ? "border-red-500/30 bg-red-500/20 text-red-600 dark:text-red-400"
-                  : "border-amber-500/30 bg-amber-500/20 text-amber-600 dark:text-amber-400"
-              }`}
-            >
-              <span className="relative flex h-2 w-2">
-                <span
-                  className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${
-                    hasDisaster ? "bg-red-500" : hasWarning ? "bg-red-400" : "bg-amber-400"
-                  }`}
-                />
-                <span
-                  className={`relative inline-flex h-2 w-2 rounded-full ${
-                    hasDisaster ? "bg-red-600" : hasWarning ? "bg-red-500" : "bg-amber-500"
-                  }`}
-                />
-              </span>
-              <span>{hasDisaster ? "🚨 DISASTERS TICKER" : hasWarning ? "⚠️ ALERTS TICKER" : "⚡ ADVISORY TICKER"}</span>
+          <div className="group relative flex items-center overflow-hidden py-2 px-3">
+            <div className="z-10 flex shrink-0 items-center gap-1.5 pr-2 font-bold tracking-wider">
+              <span className="inline-block h-2 w-2 animate-ping rounded-full bg-red-500" />
+              <span>⚠️ {t("alerts")} TICKER</span>
             </div>
-
-            <div className="relative flex-1 overflow-hidden py-2">
-              <div className="weather-ticker-track flex w-max items-center gap-8 whitespace-nowrap hover:[animation-play-state:paused]">
-                {disasters.concat(disasters).map((item, idx) => (
-                  <span key={idx} className="inline-flex items-center gap-1.5 text-card-foreground">
-                    <span className="text-sm">{item.icon}</span>
-                    <span className="font-semibold text-foreground">[{item.tag}]:</span>
-                    <span className="font-medium">{item.text}</span>
-                    <span className="font-light text-muted-foreground/50">✦</span>
+            <div className="overflow-hidden whitespace-nowrap mask-gradient flex-1">
+              <div className="inline-block animate-[ticker_90s_linear_infinite] group-hover:[animation-play-state:paused]">
+                {disasters.map((item, idx) => (
+                  <span key={idx} className="mx-4 inline-flex items-center gap-1.5 font-medium">
+                    <span>{item.icon}</span>
+                    <strong className="font-semibold uppercase tracking-wide">[{item.tag}]:</strong>
+                    <span>{item.text}</span>
+                    <span className="ml-3 text-muted-foreground/60">•</span>
                   </span>
                 ))}
               </div>
             </div>
           </div>
-        </div>
+        </section>
       )}
 
       {/* 4. KEY METRICS */}
-      <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-border pt-4 sm:grid-cols-5">
-        <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-          <span className="text-xs text-muted-foreground">{t("humidity")}</span>
-          <p className="text-base font-semibold">{w.current.humidity}%</p>
+      <section className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="rounded-xl border border-border/80 bg-card p-3 text-center shadow-xs">
+          <p className="text-xs text-muted-foreground">{t("humidity")}</p>
+          <p className="mt-1 text-lg font-bold">{w.current.humidity}%</p>
         </div>
-        <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-          <span className="text-xs text-muted-foreground">{t("wind")}</span>
-          <p className="text-base font-semibold">
-            {Math.round(w.current.wind)} <span className="text-xs font-normal text-muted-foreground">{windUnit}</span>
+        <div className="rounded-xl border border-border/80 bg-card p-3 text-center shadow-xs">
+          <p className="text-xs text-muted-foreground">{t("wind")}</p>
+          <p className="mt-1 text-lg font-bold">
+            {Math.round(w.current.wind)} <span className="text-xs font-normal">{windUnit}</span>
           </p>
         </div>
-        <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-          <span className="text-xs text-muted-foreground">{t("uv")}</span>
-          <p className="text-base font-semibold">
-            {w.current.uvIndex}{" "}
-            <span className="text-[11px] font-normal text-muted-foreground">({uvCategory(w.current.uvIndex)})</span>
+        <div className="rounded-xl border border-border/80 bg-card p-3 text-center shadow-xs">
+          <p className="text-xs text-muted-foreground">{t("uv")}</p>
+          <p className="mt-1 text-lg font-bold">
+            {w.current.uv.toFixed(1)}{" "}
+            <span className="text-xs font-normal">({uvCategory(w.current.uv)})</span>
           </p>
         </div>
-        <div className="rounded-lg bg-muted/30 p-2.5 text-center">
-          <span className="text-xs text-muted-foreground">{t("air_quality")}</span>
-          <p className="text-base font-semibold">
+        <div className="rounded-xl border border-border/80 bg-card p-3 text-center shadow-xs">
+          <p className="text-xs text-muted-foreground">{t("air_quality")}</p>
+          <p className="mt-1 text-lg font-bold">
             {w.current.aqi !== undefined ? (
               <>
                 {w.current.aqi}{" "}
-                <span className={`text-[11px] font-medium ${aqiInfo?.color}`}>({aqiInfo?.label})</span>
+                <span className={`text-xs font-normal ${aqiInfo?.color}`}>
+                  ({aqiInfo?.label})
+                </span>
               </>
             ) : (
-              <span className="text-xs text-muted-foreground">--</span>
+              "—"
             )}
           </p>
         </div>
-        <div className="col-span-2 rounded-lg bg-muted/30 p-2.5 text-center sm:col-span-1">
-          <span className="text-xs text-muted-foreground">{t("precipitation")}</span>
-          <p className="text-base font-semibold">
-            {w.current.precipitation} <span className="text-xs font-normal text-muted-foreground">{precipUnit}</span>
+      </section>
+
+      {/* 5. PRECIPITATION & SUNRISE/SUNSET */}
+      <section className="mt-2 grid grid-cols-2 gap-2">
+        <div className="rounded-xl border border-border/80 bg-card p-3 text-center shadow-xs">
+          <p className="text-xs text-muted-foreground">{t("precipitation")}</p>
+          <p className="mt-1 text-base font-bold">
+            {w.current.precipitation} <span className="text-xs font-normal">{precipUnit}</span>
           </p>
         </div>
-      </div>
-
-      {/* 5. SUNRISE / SUNSET */}
-      {(w.sun.sunrise !== "--:--" || w.sun.sunset !== "--:--") && (
-        <div className="mt-3 flex items-center justify-around rounded-lg bg-muted/20 py-2 text-xs text-muted-foreground">
-          <span>🌅 {t("sunrise")}: <strong className="text-card-foreground">{w.sun.sunrise}</strong></span>
-          <span>🌇 {t("sunset")}: <strong className="text-card-foreground">{w.sun.sunset}</strong></span>
+        <div className="rounded-xl border border-border/80 bg-card p-3 text-center shadow-xs">
+          <p className="text-xs text-muted-foreground">
+            {t("sunrise")} / {t("sunset")}
+          </p>
+          <p className="mt-1 text-sm font-semibold">
+            ☀️ {w.daily[0]?.sunrise || "—"} · 🌙 {w.daily[0]?.sunset || "—"}
+          </p>
         </div>
-      )}
+      </section>
 
-      {/* 6. HOURLY FORECAST (72px cards with wrapping words) */}
-      <section className="mt-6">
-        <h2 className="mb-2 font-semibold">{t("today")}</h2>
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {w.hourly.map((h) => {
-            const desc = describe(h.code);
+      {/* 6. HOURLY FORECAST */}
+      <section className="mt-4 rounded-2xl border border-border/80 bg-card p-4 text-card-foreground shadow-sm">
+        <h2 className="text-sm font-bold tracking-tight text-foreground">{t("today")}</h2>
+        <div className="mt-3 flex gap-2.5 overflow-x-auto pb-2 scrollbar-none">
+          {w.hourly.map((h, i) => {
+            const hd = describe(h.code);
             return (
               <div
-                key={h.time}
-                className="flex w-[72px] min-w-[72px] flex-shrink-0 min-h-[96px] flex-col items-center justify-between rounded-xl bg-card p-2 text-center text-card-foreground shadow-2xs"
+                key={i}
+                className="flex w-[72px] shrink-0 flex-col items-center justify-between rounded-xl bg-accent/40 p-2 text-center"
               >
-                <p className="text-xs text-muted-foreground">{h.time.slice(11, 16)}</p>
-                <p className="my-0.5 text-xl">{desc.icon}</p>
-                <div className="flex w-full min-w-0 flex-1 items-center justify-center">
-                  <div
-                    className="text-[11px] font-medium leading-[13px] text-muted-foreground break-words line-clamp-2 text-center"
-                    title={desc.label}
-                  >
-                    {desc.label}
-                  </div>
-                </div>
-                <p className="font-semibold">{Math.round(h.temp)}°</p>
-                {h.precipProb > 0 && (
-                  <span className="mt-0.5 block text-[10px] font-medium text-blue-500">
-                    💧{h.precipProb}%
-                  </span>
-                )}
+                <span className="text-xs text-muted-foreground font-medium">{h.time}</span>
+                <span className="my-1 text-xl" role="img" aria-label={hd.label}>
+                  {hd.icon}
+                </span>
+                <span className="text-sm font-bold">
+                  {Math.round(h.temp)}
+                  {tempSymbol}
+                </span>
+                <span className="mt-1 text-[10px] text-muted-foreground line-clamp-2 break-words leading-tight">
+                  {hd.label}
+                </span>
               </div>
             );
           })}
@@ -453,66 +423,35 @@ export function WeatherView({
       </section>
 
       {/* 7. 7-DAY FORECAST */}
-      <section className="mt-6">
-        <h2 className="mb-2 font-semibold">{t("seven_day")}</h2>
-        <ul className="divide-y divide-border rounded-lg bg-card text-card-foreground shadow-2xs">
-          {w.daily.map((day, i) => {
-            const desc = describe(day.code);
+      <section className="mt-4 rounded-2xl border border-border/80 bg-card p-4 text-card-foreground shadow-sm">
+        <h2 className="text-sm font-bold tracking-tight text-foreground">{t("seven_day")}</h2>
+        <div className="mt-3 divide-y divide-border/60">
+          {w.daily.map((dItem, i) => {
+            const dd = describe(dItem.code);
             return (
-              <li key={day.date} className="flex items-center justify-between gap-2 px-4 py-3">
-                <span className="w-20 shrink-0 text-sm font-medium sm:w-24">
-                  {i === 0 ? t("today") : new Date(day.date + "T12:00").toLocaleDateString(undefined, { weekday: "short" })}
-                </span>
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="shrink-0 text-xl" role="img" aria-label={desc.label}>
-                    {desc.icon}
+              <div key={i} className="flex items-center justify-between py-2.5 text-xs">
+                <span className="w-16 font-medium text-foreground">{dItem.day}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg" role="img" aria-label={dd.label}>
+                    {dd.icon}
                   </span>
-                  <span className="truncate text-xs font-normal text-card-foreground sm:text-sm">
-                    {desc.label}
-                  </span>
-                  {day.precipProbMax > 0 && (
-                    <span className="shrink-0 text-xs font-medium text-blue-500">
-                      💧{day.precipProbMax}%
-                    </span>
-                  )}
+                  <span className="text-muted-foreground">{dd.label}</span>
                 </div>
-                <span className="w-20 shrink-0 text-right text-sm sm:w-24">
-                  <span className="font-semibold">{Math.round(day.max)}°</span>{" "}
-                  <span className="text-muted-foreground">{Math.round(day.min)}°</span>
-                </span>
-              </li>
+                <div className="flex items-center gap-2 font-mono">
+                  <span className="font-bold text-foreground">
+                    {Math.round(dItem.max)}
+                    {tempSymbol}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {Math.round(dItem.min)}
+                    {tempSymbol}
+                  </span>
+                </div>
+              </div>
             );
           })}
-        </ul>
+        </div>
       </section>
-
-      <p className="mt-6 text-center text-xs text-muted-foreground">
-        Data by{" "}
-        <a className="underline hover:text-foreground" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">
-          Open-Meteo
-        </a>
-        ,{" "}
-        <a className="underline hover:text-foreground" href="https://earthquake.usgs.gov/" target="_blank" rel="noopener noreferrer">
-          USGS
-        </a>
-        , TMD &{" "}
-        <a className="underline hover:text-foreground" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">
-          NWS
-        </a>
-      </p>
-
-      <style>{`
-        @keyframes weatherTickerAnimation {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .weather-ticker-track {
-          animation: weatherTickerAnimation 90s linear infinite;
-        }
-        .weather-ticker-track:hover {
-          animation-play-state: paused;
-        }
-      `}</style>
     </>
   );
 }
