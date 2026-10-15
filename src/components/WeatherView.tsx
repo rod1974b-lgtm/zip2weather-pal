@@ -152,7 +152,65 @@ export function WeatherView({
 
   return (
     <>
-      {/* 1. HERO CARD WITH VIBRANT WATERCOLOR / LANDMARK ART, SPINNER & BADGE */}
+      {/* 1. DISASTER / WEATHER ALERTS TICKER OR ALL CLEAR BANNER (NOW AT TOP) */}
+      {disasters && disasters.length > 0 ? (
+        <section className="mt-3">
+          <div
+            className={`flex items-center overflow-hidden rounded-xl border text-xs shadow-xs ${
+              hasDisaster
+                ? "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300"
+                : "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300"
+            }`}
+          >
+            <div className="flex shrink-0 items-center gap-1.5 px-3 py-2 font-bold uppercase tracking-wider text-[11px] border-r border-border/50 bg-background/50">
+              <span className="relative flex h-2 w-2">
+                <span
+                  className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${
+                    hasDisaster ? "bg-red-400" : "bg-amber-400"
+                  }`}
+                />
+                <span
+                  className={`relative inline-flex h-2 w-2 rounded-full ${
+                    hasDisaster ? "bg-red-500" : "bg-amber-500"
+                  }`}
+                />
+              </span>
+              <span>
+                {hasDisaster
+                  ? "🚨 DISASTERS TICKER"
+                  : hasWarning
+                  ? "⚠️ ALERTS TICKER"
+                  : "⚡ ADVISORY TICKER"}
+              </span>
+            </div>
+
+            <div className="relative flex-1 overflow-hidden py-2">
+              <div className="weather-ticker-track flex w-max items-center gap-8 whitespace-nowrap hover:[animation-play-state:paused]">
+                {disasters.concat(disasters).map((item, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-1.5 text-card-foreground">
+                    <span className="text-sm">{item.icon}</span>
+                    <span className="font-semibold text-foreground">[{item.tag}]:</span>
+                    <span className="font-medium">{item.text}</span>
+                    <span className="font-light text-muted-foreground/50">✦</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="mt-3">
+          <div className="flex w-full min-h-[56px] flex-wrap items-center overflow-visible rounded-xl bg-green-500 px-4 py-3 text-xs shadow-xs">
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-medium leading-[18px] text-white break-words whitespace-normal">
+                🛡️ All clear - No severe weather expected in your area today. Enjoy your day!
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 2. HERO CARD WITH VIBRANT WATERCOLOR / LANDMARK ART, SPINNER & BADGE */}
       <section
         className="relative mt-4 overflow-hidden rounded-2xl p-6 text-white shadow-lg transition-all duration-700 bg-slate-900 min-h-[190px]"
         style={bgStyle}
@@ -237,7 +295,7 @@ export function WeatherView({
         </div>
       </section>
 
-      {/* 2. WHAT TO WEAR SECTION */}
+      {/* 3. WHAT TO WEAR SECTION */}
       <section className="mt-4 rounded-xl border border-primary/20 bg-gradient-to-br from-card via-card to-accent/30 p-4 text-card-foreground shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
           <div className="flex items-center gap-2">
@@ -300,64 +358,6 @@ export function WeatherView({
           </button>
         </div>
       </section>
-
-      {/* 3. DISASTER / WEATHER ALERTS TICKER OR ALL CLEAR BANNER */}
-      {disasters && disasters.length > 0 ? (
-        <section className="mt-4">
-          <div
-            className={`flex items-center overflow-hidden rounded-xl border text-xs shadow-xs ${
-              hasDisaster
-                ? "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300"
-                : "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300"
-            }`}
-          >
-            <div className="flex shrink-0 items-center gap-1.5 px-3 py-2 font-bold uppercase tracking-wider text-[11px] border-r border-border/50 bg-background/50">
-              <span className="relative flex h-2 w-2">
-                <span
-                  className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${
-                    hasDisaster ? "bg-red-400" : "bg-amber-400"
-                  }`}
-                />
-                <span
-                  className={`relative inline-flex h-2 w-2 rounded-full ${
-                    hasDisaster ? "bg-red-500" : "bg-amber-500"
-                  }`}
-                />
-              </span>
-              <span>
-                {hasDisaster
-                  ? "🚨 DISASTERS TICKER"
-                  : hasWarning
-                  ? "⚠️ ALERTS TICKER"
-                  : "⚡ ADVISORY TICKER"}
-              </span>
-            </div>
-
-            <div className="relative flex-1 overflow-hidden py-2">
-              <div className="weather-ticker-track flex w-max items-center gap-8 whitespace-nowrap hover:[animation-play-state:paused]">
-                {disasters.concat(disasters).map((item, idx) => (
-                  <span key={idx} className="inline-flex items-center gap-1.5 text-card-foreground">
-                    <span className="text-sm">{item.icon}</span>
-                    <span className="font-semibold text-foreground">[{item.tag}]:</span>
-                    <span className="font-medium">{item.text}</span>
-                    <span className="font-light text-muted-foreground/50">✦</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-      ) : (
-        <section className="mt-4">
-          <div className="flex w-full min-h-[56px] flex-wrap items-center overflow-visible rounded-xl bg-green-500 px-4 py-3 text-xs shadow-xs">
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-medium leading-[18px] text-white break-words whitespace-normal">
-                🛡️ All clear - No severe weather expected in your area today. Enjoy your day!
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* 4. CURRENT METRICS GRID */}
       <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -505,7 +505,7 @@ export function WeatherView({
         </a>
       </p>
 
-      {/* Faster 35s ticker animation styling */}
+      {/* 35s ticker animation styling */}
       <style>{`
         @keyframes weatherTickerAnimation {
           0% { transform: translateX(0); }
