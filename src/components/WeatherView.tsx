@@ -1,26 +1,24 @@
 // src/components/WeatherView.tsx
-
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  type Weather,
-  describe,
-  getClothingAdvice,
-  aqiCategory,
-  uvCategory,
-} from "@/lib/weather";
+import { describe, uvCategory, aqiCategory, type Weather } from "@/lib/weather";
 import { getCityWeatherBackground } from "@/lib/aiWatercolorGenerator";
 
 export interface TickerAlertItem {
-  icon: string;
-  tag: string;
-  text: string;
-  severity: "disaster" | "warning" | "caution" | "clear";
+  id: string;
+  source: string;
+  headline: string;
+  severity: "extreme" | "severe" | "moderate" | "minor";
+  event: string;
+  expires?: string;
+  areas?: string;
+  effective?: string;
+  details?: string;
 }
 
-function formatTimeAgo(timestamp?: number): string {
+function formatTimeAgo(timestamp: number | null | undefined): string {
   if (!timestamp || isNaN(timestamp)) return "Just now";
-  const diffSec = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
   if (diffSec < 60) return "Just now";
   const diffMin = Math.floor(diffSec / 60);
   if (diffMin < 60) return `${diffMin}m ago`;
@@ -56,15 +54,13 @@ export function WeatherView({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAiGenerated, setIsAiGenerated] = useState(false);
   const [wearStyle, setWearStyle] = useState<"casual" | "business" | "sport">("casual");
-  const baseAdvice = getClothingAdvice(w);
-  const aqiInfo = w.current.aqi !== undefined ? aqiCategory(w.current.aqi) : null;
 
   const tempC = w.unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
   const isRainy = w.current.code >= 51 && w.current.code <= 82;
   const isFreezing = tempC <= 5;
   const isWarm = tempC >= 22;
 
-  // Curated AI Watercolor Background Effect with Landmark Priority
+  // Curated & Dynamic Landmark Scanner Background Effect
   useEffect(() => {
     if (!w?.place?.name) return;
     let active = true;
@@ -83,13 +79,15 @@ export function WeatherView({
           setIsGenerating(false);
         }
       },
-      w.place.country
+      w.place.country,
+      w.place.lat,
+      w.place.lon
     )
       .then(({ initialBg, isAi }) => {
         if (!active) return;
         setHeroBg(initialBg);
         setIsAiGenerated(isAi);
-        setIsGenerating(false);
+        if (isAi) setIsGenerating(false);
       })
       .catch(() => {
         if (active) setIsGenerating(false);
@@ -98,25 +96,35 @@ export function WeatherView({
     return () => {
       active = false;
     };
-  }, [w.place.name, w.place.country, w.current.code, w.current.temp, w.unit, d.label, tempC]);
+  }, [w.place.name, w.place.lat, w.place.lon, w.current.code, d.label, tempC, w.place.country]);
 
-  const hasDisaster = disasters.some((a) => a.severity === "disaster");
-  const hasWarning = disasters.some((a) => a.severity === "warning");
-  const hasCaution = disasters.some((a) => a.severity === "caution");
+  // Tailored clothing advice
+  let tailoredAdvice =
+    "Comfortable light layers, cotton tee, breathable pants, and easy-walking sneakers.";
 
-  let tailoredAdvice = baseAdvice;
-  if (wearStyle === "business") {
+  if (wearStyle === "casual") {
     if (isFreezing) {
       tailoredAdvice =
-        "Wool overcoat, tailored suit or knit blazer, leather dress shoes, and a scarf." +
-        (isRainy ? " Carry a classic dark umbrella." : "");
+        "Heavy winter coat, fleece-lined sweater, thermal socks, warm boots, and a snug beanie.";
     } else if (isWarm) {
       tailoredAdvice =
-        "Lightweight linen or breathable cotton dress shirt, tailored chinos, loafers, and sunglasses." +
+        "Breathable cotton or linen shirt, light shorts or chinos, sunglasses, and comfortable sneakers." +
         (isRainy ? " Keep a compact umbrella handy." : "");
     } else {
       tailoredAdvice =
-        "Structured blazer, crisp collared shirt, tailored trousers, and dress shoes." +
+        "Layered light sweater or casual jacket, classic jeans, and weather-ready sneakers.";
+    }
+  } else if (wearStyle === "business") {
+    if (isFreezing) {
+      tailoredAdvice =
+        "Tailored wool overcoat, cashmere scarf, structured suit or blazer, and weather-treated dress shoes.";
+    } else if (isWarm) {
+      tailoredAdvice =
+        "Lightweight wool or linen-blend suit, crisp short-sleeve or rolled-sleeve dress shirt, and loafers." +
+        (isRainy ? " Bring an umbrella." : "");
+    } else {
+      tailoredAdvice =
+        "Structured blazer, knit crewneck or collared shirt, tailored trousers, and leather oxfords." +
         (isRainy ? " Bring an umbrella." : "");
     }
   } else if (wearStyle === "sport") {
@@ -146,18 +154,18 @@ export function WeatherView({
 
   return (
     <>
-      {/* 1. HERO CARD WITH VIBRANT WATERCOLOR, SPINNER & BADGE */}
+      {/* 1. HERO CARD WITH VIBRANT WATERCOLOR / LANDMARK ART, SPINNER & BADGE */}
       <section
         className="relative mt-4 overflow-hidden rounded-2xl p-6 text-white shadow-lg transition-all duration-700 bg-slate-900 min-h-[190px]"
         style={bgStyle}
       >
-        <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" />
+        <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]" />
 
-        {/* Spinner while loading art */}
+        {/* Spinner while discovering or downloading art */}
         {isGenerating && (
           <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-md shadow-sm">
             <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-            <span>Generating vibrant art…</span>
+            <span>Scanning landmark art…</span>
           </div>
         )}
 
@@ -194,7 +202,8 @@ export function WeatherView({
                     </span>
                   </div>
                   <p className="text-sm text-slate-200 drop-shadow-sm">
-                    {d.label} · {t("feels_like")} {Math.round(w.current.feels)}{tempSymbol}
+                    {d.label} · {t("feels_like")} {Math.round(w.current.feels)}
+                    {tempSymbol}
                   </p>
                 </div>
               </div>
@@ -230,7 +239,7 @@ export function WeatherView({
         </div>
       </section>
 
-      {/* 2. WHAT TO WEAR (COMPETITIVE ADVANTAGE #2) */}
+      {/* 2. WHAT TO WEAR SECTION */}
       <section className="mt-4 rounded-xl border border-primary/20 bg-gradient-to-br from-card via-card to-accent/30 p-4 text-card-foreground shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
           <div className="flex items-center gap-2">
@@ -249,7 +258,7 @@ export function WeatherView({
                 onClick={() => setWearStyle(style)}
                 className={`rounded-md px-2 py-1 font-medium capitalize transition-all ${
                   wearStyle === style
-                    ? "bg-background text-foreground shadow-xs"
+                    ? "bg-primary text-primary-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -260,165 +269,128 @@ export function WeatherView({
         </div>
 
         <div className="mt-3 flex items-start gap-3">
-          <span className="text-2xl mt-0.5">
-            {wearStyle === "casual" ? "👕" : wearStyle === "business" ? "💼" : "🏃"}
+          <span className="text-2xl select-none">
+            {wearStyle === "casual" ? "👟" : wearStyle === "business" ? "💼" : "🏃"}
           </span>
-          <div className="flex-1 text-sm leading-relaxed">
-            <p className="font-medium text-foreground">{tailoredAdvice}</p>
+          <div className="flex-1">
+            <p className="text-sm leading-relaxed text-foreground/90 font-medium">{tailoredAdvice}</p>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              💡 <span className="font-medium">{t("best_time")}:</span>{" "}
-              {tempC >= 28
-                ? "Early morning before 09:30 or after 17:30 to avoid intense tropical heat and sun exposure."
-                : tempC <= 10
-                ? "Midday between 11:30 and 15:00 when ambient sunshine and temperatures peak."
-                : "Great outdoor conditions throughout the day; keep water handy."}
+              💡 {t("best_time")}:{" "}
+              {isRainy
+                ? "Rain expected today. Indoor spots recommended."
+                : tempC > 30
+                  ? "Early morning or after 17:00 when temperatures ease."
+                  : "Midday to afternoon conditions are great for outdoors."}
             </p>
           </div>
         </div>
 
-        <div className="mt-3 flex justify-end">
+        <div className="mt-3 flex items-center justify-end border-t border-border/40 pt-2 text-xs">
           <button
             type="button"
             onClick={() => {
-              const text = `Weather in ${w.place.name}: ${Math.round(w.current.temp)}${tempSymbol}, ${d.label}. Recommendation: ${tailoredAdvice}`;
+              const text = `Today in ${w.place.name}: ${Math.round(w.current.temp)}${tempSymbol}, ${d.label}. Wear advice: ${tailoredAdvice}`;
               if (navigator.share) {
-                navigator.share({ title: "My Weather Pal Style Advice", text }).catch(() => {});
+                navigator.share({ title: "My Weather Pal", text }).catch(() => {});
               } else {
-                navigator.clipboard.writeText(text);
+                navigator.clipboard?.writeText(text);
               }
             }}
-            className="text-[11px] font-medium text-primary hover:underline inline-flex items-center gap-1"
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
-            <span>📤</span> Share advice
+            <span>📤 Share outfit tip</span>
           </button>
         </div>
       </section>
 
-      {/* 3. WEATHER ALERTS & DISASTERS TICKER */}
-      <section className="mt-4">
-        {hasDisaster || hasWarning || hasCaution ? (
-          <div className="overflow-hidden rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-card-foreground">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-destructive" />
-              </span>
-              <span className="text-xs font-bold uppercase tracking-wider text-destructive">
-                {t("alerts")} & Natural Disasters
-              </span>
-            </div>
-            <div className="divide-y divide-border/60">
-              {disasters
-                .filter((d) => d.severity !== "clear")
-                .map((a, i) => (
-                  <div key={i} className="py-2 first:pt-0 last:pb-0 flex items-start gap-2.5">
-                    <span className="text-lg">{a.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold tracking-wide uppercase text-foreground">
-                        {a.tag}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5 break-words">
-                        {a.text}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-            </div>
+      {/* 3. DISASTER / WEATHER ALERTS TICKER */}
+      {disasters.length > 0 && (
+        <section className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-destructive shadow-xs">
+          <div className="flex items-center gap-2 font-semibold text-sm">
+            <span>⚠️</span>
+            <span>Active Alerts & Disaster Notices ({disasters.length})</span>
           </div>
-        ) : (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-card-foreground flex items-center gap-2.5">
-            <span className="text-xl">🛡️</span>
-            <div>
-              <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
-                {t("all_clear")}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                No active meteorological, seismic, or hydrological disaster emergencies reported for this area.
-              </p>
-            </div>
+          <div className="mt-2 space-y-1.5 text-xs">
+            {disasters.map((item) => (
+              <div key={item.id} className="rounded-md bg-background/60 p-2 text-foreground">
+                <span className="font-semibold text-destructive">{item.event}: </span>
+                <span>{item.headline}</span>
+              </div>
+            ))}
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      {/* 4. KEY METRICS */}
+      {/* 4. CURRENT METRICS GRID */}
       <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
           <p className="text-xs text-muted-foreground">{t("humidity")}</p>
-          <p className="mt-1 text-lg font-semibold">{w.current.humidity}%</p>
+          <p className="mt-1 text-lg font-bold">{w.current.humidity}%</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
           <p className="text-xs text-muted-foreground">{t("wind")}</p>
-          <p className="mt-1 text-lg font-semibold">
+          <p className="mt-1 text-lg font-bold">
             {Math.round(w.current.wind)} {windUnit}
           </p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
           <p className="text-xs text-muted-foreground">{t("uv")}</p>
-          <p className="mt-1 text-lg font-semibold">
-            {w.current.uvIndex ?? 0}{" "}
+          <p className="mt-1 text-lg font-bold">
+            {Math.round(w.current.uvIndex ?? 0)}{" "}
             <span className="text-xs font-normal text-muted-foreground">
               ({uvCategory(w.current.uvIndex ?? 0)})
             </span>
           </p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
           <p className="text-xs text-muted-foreground">{t("air_quality")}</p>
-          <p className="mt-1 text-lg font-semibold">
+          <p className="mt-1 text-lg font-bold">
             {w.current.aqi !== undefined ? (
               <>
                 {w.current.aqi}{" "}
                 <span className="text-xs font-normal text-muted-foreground">
-                  ({aqiInfo?.label ?? "Good"})
+                  ({aqiCategory(w.current.aqi).label})
                 </span>
               </>
             ) : (
-              "—"
+              "Good"
             )}
           </p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
           <p className="text-xs text-muted-foreground">{t("precipitation")}</p>
-          <p className="mt-1 text-lg font-semibold">
+          <p className="mt-1 text-lg font-bold">
             {w.current.precipitation} {precipUnit}
           </p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
           <p className="text-xs text-muted-foreground">{t("sunrise")}</p>
-          <p className="mt-1 text-lg font-semibold">
-            {w.sun?.sunrise ? w.sun.sunrise.slice(11, 16) : "06:00"}
-          </p>
+          <p className="mt-1 text-lg font-bold">{w.sun?.sunrise?.slice(11, 16) || "--:--"}</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
           <p className="text-xs text-muted-foreground">{t("sunset")}</p>
-          <p className="mt-1 text-lg font-semibold">
-            {w.sun?.sunset ? w.sun.sunset.slice(11, 16) : "18:30"}
-          </p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
-          <p className="text-xs text-muted-foreground">Atmosphere</p>
-          <p className="mt-1 text-lg font-semibold">Stable</p>
+          <p className="mt-1 text-lg font-bold">{w.sun?.sunset?.slice(11, 16) || "--:--"}</p>
         </div>
       </section>
 
       {/* 5. HOURLY FORECAST */}
-      <section className="mt-4 rounded-xl border border-border bg-card p-4 text-card-foreground">
-        <h3 className="font-semibold">{t("today")}</h3>
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
-          {w.hourly.slice(0, 12).map((h, i) => {
+      <section className="mt-4 rounded-xl border border-border/60 bg-card p-4 shadow-xs">
+        <h3 className="font-semibold text-sm mb-3">{t("today")}</h3>
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+          {w.hourly.slice(0, 24).map((h, i) => {
             const hDesc = describe(h.code);
             return (
               <div
                 key={i}
-                className="flex w-[72px] shrink-0 flex-col items-center rounded-lg bg-muted/50 p-2 text-center"
+                className="flex w-[72px] shrink-0 flex-col items-center rounded-lg border border-border/40 bg-muted/40 p-2 text-center"
               >
-                <span className="text-xs text-muted-foreground">
-                  {h.time.slice(11, 16)}
+                <span className="text-xs text-muted-foreground">{h.time.slice(11, 16)}</span>
+                <span className="my-1 text-xl">{hDesc.icon}</span>
+                <span className="text-sm font-bold">
+                  {Math.round(h.temp)}
+                  {tempSymbol}
                 </span>
-                <span className="my-1 text-2xl">{hDesc.icon}</span>
-                <span className="text-xs font-semibold">
-                  {Math.round(h.temp)}{tempSymbol}
-                </span>
-                <span className="mt-1 text-[10px] text-muted-foreground line-clamp-2 break-words leading-tight">
+                <span className="mt-1 text-[10px] text-muted-foreground line-clamp-2 break-words">
                   {hDesc.label}
                 </span>
               </div>
@@ -428,33 +400,34 @@ export function WeatherView({
       </section>
 
       {/* 6. 7-DAY FORECAST */}
-      <section className="mt-4 rounded-xl border border-border bg-card p-4 text-card-foreground">
-        <h3 className="font-semibold">{t("seven_day")}</h3>
-        <div className="mt-3 divide-y divide-border">
+      <section className="mt-4 rounded-xl border border-border/60 bg-card p-4 shadow-xs">
+        <h3 className="font-semibold text-sm mb-3">{t("seven_day")}</h3>
+        <div className="divide-y divide-border/40">
           {w.daily.map((dItem, i) => {
             const dayDesc = describe(dItem.code);
-            const dayLabel =
+            const dayName =
               i === 0
                 ? "Today"
                 : new Date(dItem.date + "T12:00:00").toLocaleDateString(undefined, {
                     weekday: "short",
                   });
-
             return (
-              <div key={i} className="flex items-center justify-between py-2 text-sm">
-                <span className="w-16 font-medium">{dayLabel}</span>
-                <div className="flex items-center gap-2 flex-1 justify-center">
-                  <span>{dayDesc.icon}</span>
+              <div key={dItem.date} className="flex items-center justify-between py-2.5 text-sm">
+                <span className="w-16 font-medium">{dayName}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{dayDesc.icon}</span>
                   <span className="text-xs text-muted-foreground hidden sm:inline">
                     {dayDesc.label}
                   </span>
                 </div>
-                <div className="flex gap-2">
-                  <span className="font-semibold">
-                    {Math.round(dItem.max)}{tempSymbol}
+                <div className="flex items-center gap-3">
+                  <span className="font-bold">
+                    {Math.round(dItem.max)}
+                    {tempSymbol}
                   </span>
                   <span className="text-muted-foreground">
-                    {Math.round(dItem.min)}{tempSymbol}
+                    {Math.round(dItem.min)}
+                    {tempSymbol}
                   </span>
                 </div>
               </div>
