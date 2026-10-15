@@ -155,11 +155,20 @@ export function AppMenu({
         <span className="text-xs opacity-60">▾</span>
       </button>
 
+      {/* Backdrop for touch screens */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[1px] sm:hidden"
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {isOpen && (
         <div
           role="menu"
           aria-orientation="vertical"
-          className="absolute right-0 z-50 mt-2 w-72 origin-top-right rounded-xl border border-border bg-card p-3 text-card-foreground shadow-xl ring-1 ring-black/5 animate-in fade-in zoom-in-95"
+          className="absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-[290px] sm:w-72 origin-top-right rounded-xl border border-border bg-card p-3 text-card-foreground shadow-2xl ring-1 ring-black/10 animate-in fade-in zoom-in-95 max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border pb-2 mb-3">
@@ -167,7 +176,8 @@ export function AppMenu({
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="text-xs text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted"
+              className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted font-bold"
+              aria-label="Close settings"
             >
               ✕
             </button>
