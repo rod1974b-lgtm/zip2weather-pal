@@ -505,14 +505,14 @@ export function WeatherView({
         </a>
       </p>
 
-      {/* 90s ticker animation styling */}
+      {/* Faster 35s ticker animation styling */}
       <style>{`
         @keyframes weatherTickerAnimation {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
         .weather-ticker-track {
-          animation: weatherTickerAnimation 90s linear infinite;
+          animation: weatherTickerAnimation 35s linear infinite;
         }
         .weather-ticker-track:hover {
           animation-play-state: paused;
