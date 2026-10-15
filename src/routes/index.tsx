@@ -486,7 +486,7 @@ function evaluateAllDisastersAndAlerts(
     }
   }
 
-  if (w.current.uvIndex >= 11) {
+  if (w.current.uvIndex !== undefined && w.current.uvIndex >= 11) {
     items.push({
       icon: "☀️",
       tag: "EXTREME UV RADIATION HAZARD",
@@ -752,13 +752,21 @@ function Index() {
   const autoSky = weather ? skyKey(weather.current.code, weather.current.is_day) : "default";
   const sky = skyChoice === "auto" ? autoSky : skyChoice;
 
+  useEffect(() => {
+    const isDarkSky = sky === "clear-night" || sky === "cloudy-night" || sky === "storm";
+    document.documentElement.classList.toggle("dark", isDarkSky);
+    return () => {
+      document.documentElement.classList.remove("dark");
+    };
+  }, [sky]);
+
   return (
     <div className={`sky sky-${sky} min-h-screen text-foreground`}>
       {showOnboarding && (
         <OnboardingCarousel onFinish={() => setShowOnboarding(false)} />
       )}
       <main className="mx-auto max-w-2xl px-4 py-8">
-              <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight">My Weather Pal</h1>
           <AppMenu
             unit={unit}
