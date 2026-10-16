@@ -2,7 +2,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { describe, uvCategory, aqiCategory, type Weather } from "@/lib/weather";
-import { getCityWeatherBackground } from "@/lib/aiWatercolorGenerator";
+import {
+  getCityWeatherBackground,
+  getAllAvailableArtworks,
+  saveCustomArtChoice,
+} from "@/lib/aiWatercolorGenerator";
 
 export interface TickerAlertItem {
   icon: string;
@@ -185,8 +189,35 @@ export function WeatherView({
     setShowArtMenu(false);
   }
 
-  // Cycle to next artwork
+  // Cycle to next artwork in the city/weather list
   function handleCycleArtwork() {
+    const options = getAllAvailableArtworks(
+      w.place.name,
+      w.current.code,
+      d.label,
+      w.place.country
+    );
+
+    if (!options.length) return;
+
+    const currentIdx = options.findIndex((url) => heroBg.includes(url));
+    const nextIdx = (currentIdx + 1) % options.length;
+    const nextUrl = options[nextIdx];
+
+    saveCustomArtChoice(w.place.name, nextUrl);
+    setHeroBg(nextUrl);
+    setIsAiGenerated(true);
+    setIsGenerating(false);
+    setShowArtMenu(false);
+  }
+
+  // Restore dynamic auto artwork
+  function handleAutoArtwork() {
+    if (customPhoto) handleRemoveCustomPhoto();
+    try {
+      localStorage.removeItem(`weather:custom-art:${w.place.name.toLowerCase().trim()}`);
+    } catch {}
+
     setIsGenerating(true);
     getCityWeatherBackground(
       w.place.name,
@@ -210,6 +241,7 @@ export function WeatherView({
         setIsGenerating(false);
       })
       .catch(() => setIsGenerating(false));
+
     setShowArtMenu(false);
   }
 
@@ -395,10 +427,7 @@ export function WeatherView({
                     <div className="absolute left-0 top-full mt-1.5 z-40 w-48 rounded-xl border border-white/20 bg-slate-900/95 backdrop-blur-md p-1.5 text-xs text-white shadow-2xl ring-1 ring-black/20">
                       <button
                         type="button"
-                        onClick={() => {
-                          if (customPhoto) handleRemoveCustomPhoto();
-                          handleCycleArtwork();
-                        }}
+                        onClick={handleAutoArtwork}
                         className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-white/10 transition-colors"
                       >
                         <span>🎨</span>
