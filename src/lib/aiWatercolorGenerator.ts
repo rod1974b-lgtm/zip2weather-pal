@@ -1,93 +1,146 @@
 // src/lib/aiWatercolorGenerator.ts
 
-// 1. Curated City & Landmark Vibrant Artworks (Top Priority)
-const LANDMARK_WATERCOLORS: Record<string, string> = {
+// 1. Curated City & Landmark Vibrant Artworks (Multiple variants per destination)
+export const LANDMARK_WATERCOLORS: Record<string, string[]> = {
   // Thailand & Southeast Asia
-  ratchaburi:
-    "https://images.unsplash.com/photo-1528181304800-259b08848526?auto=format&fit=crop&w=800&q=75", // Rice paddies & countryside
-  bangkok:
-    "https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=800&q=75", // Wat Arun temple & Chao Phraya
-  "chiang mai":
-    "https://images.unsplash.com/photo-1528181304800-259b08848526?auto=format&fit=crop&w=800&q=75",
-  phuket:
+  ratchaburi: [
+    "https://images.unsplash.com/photo-1528181304800-259b08848526?auto=format&fit=crop&w=800&q=75", // Rice paddies & scenic countryside
+    "https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=800&q=75", // Traditional riverside temple
+    "https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?auto=format&fit=crop&w=800&q=75", // Tropical limestone karst
+  ],
+  bangkok: [
+    "https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=800&q=75", // Wat Arun & Chao Phraya
+    "https://images.unsplash.com/photo-1563492065599-3580f77520f2?auto=format&fit=crop&w=800&q=75", // Grand Palace golden stupa
+    "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=800&q=75", // Evening skyline & river
+  ],
+  "chiang mai": [
+    "https://images.unsplash.com/photo-1528181304800-259b08848526?auto=format&fit=crop&w=800&q=75", // Doi Suthep mist & mountain
+    "https://images.unsplash.com/photo-1512553353614-82a7370096dc?auto=format&fit=crop&w=800&q=75", // Lanna ancient temple
+  ],
+  phuket: [
+    "https://images.unsplash.com/photo-1589394815804-964ed0be2eb5?auto=format&fit=crop&w=800&q=75", // Andaman emerald sea
+    "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=75", // Sunset tropical bay
+  ],
+  krabi: [
     "https://images.unsplash.com/photo-1589394815804-964ed0be2eb5?auto=format&fit=crop&w=800&q=75",
-  krabi:
-    "https://images.unsplash.com/photo-1589394815804-964ed0be2eb5?auto=format&fit=crop&w=800&q=75",
-  singapore:
-    "https://images.unsplash.com/photo-1525625293386-3f8f99389edd?auto=format&fit=crop&w=800&q=75",
-  bali:
-    "https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=800&q=75",
+    "https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?auto=format&fit=crop&w=800&q=75",
+  ],
+  singapore: [
+    "https://images.unsplash.com/photo-1525625293386-3f8f99389edd?auto=format&fit=crop&w=800&q=75", // Marina Bay Sands watercolor
+    "https://images.unsplash.com/photo-1506351421178-63b52a2d2562?auto=format&fit=crop&w=800&q=75", // Supertree Grove gardens
+  ],
+  bali: [
+    "https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=800&q=75", // Ulun Danu water temple
+    "https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?auto=format&fit=crop&w=800&q=75", // Tegalalang terraces
+  ],
 
   // East Asia
-  tokyo:
+  tokyo: [
+    "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=800&q=75", // Mount Fuji & pagoda
+    "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=800&q=75", // Tokyo Tower sunset
+  ],
+  kyoto: [
     "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=800&q=75",
-  kyoto:
-    "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=800&q=75",
-  seoul:
-    "https://images.unsplash.com/photo-1538485399081-7191377e8241?auto=format&fit=crop&w=800&q=75",
+    "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=800&q=75",
+  ],
+  seoul: [
+    "https://images.unsplash.com/photo-1538485399081-7191377e8241?auto=format&fit=crop&w=800&q=75", // Gyeongbokgung palace
+    "https://images.unsplash.com/photo-1517154421773-0529f29ea451?auto=format&fit=crop&w=800&q=75", // N Seoul Tower night
+  ],
 
   // Europe
-  london:
-    "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=800&q=75",
-  paris:
-    "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=800&q=75",
-  rome:
-    "https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=800&q=75",
-  skopje:
-    "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=800&q=75",
+  london: [
+    "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=800&q=75", // Big Ben & Westminster
+    "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&w=800&q=75", // Tower Bridge
+  ],
+  paris: [
+    "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=800&q=75", // Eiffel Tower morning mist
+    "https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=800&q=75", // Pont des Arts & Seine
+  ],
+  rome: [
+    "https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=800&q=75", // Colosseum watercolor
+    "https://images.unsplash.com/photo-1531572753322-ad063cecc140?auto=format&fit=crop&w=800&q=75", // Trevi Fountain
+  ],
+  skopje: [
+    "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=800&q=75", // Stone Bridge & Vardar river
+    "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=75",
+  ],
 
   // Americas & Worldwide
-  "new york":
-    "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&w=800&q=75",
-  "san francisco":
-    "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fit=crop&w=800&q=75",
-  sydney:
-    "https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?auto=format&fit=crop&w=800&q=75",
+  "new york": [
+    "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&w=800&q=75", // Brooklyn Bridge
+    "https://images.unsplash.com/photo-1518391846015-55a9cc003b25?auto=format&fit=crop&w=800&q=75", // Central Park skyline
+  ],
+  "san francisco": [
+    "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fit=crop&w=800&q=75", // Golden Gate Bridge
+    "https://images.unsplash.com/photo-1449034446853-66c86144b0ad?auto=format&fit=crop&w=800&q=75",
+  ],
+  sydney: [
+    "https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?auto=format&fit=crop&w=800&q=75", // Sydney Opera House
+    "https://images.unsplash.com/photo-1523482580672-f109ba8cb9be?auto=format&fit=crop&w=800&q=75", // Harbour Bridge
+  ],
 };
 
-// 2. Weather condition art
-const WEATHER_WATERCOLORS: {
-  thunderstorm: string;
-  rain: string;
-  snow: string;
-  fog: string;
-  clear: string;
-  clouds: string;
-} = {
-  thunderstorm:
+// 2. Weather condition art variants
+export const WEATHER_WATERCOLORS: Record<string, string[]> = {
+  thunderstorm: [
     "https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=800&q=75",
-  rain:
+    "https://images.unsplash.com/photo-1511289081-d06dda19034d?auto=format&fit=crop&w=800&q=75",
+  ],
+  rain: [
     "https://images.unsplash.com/photo-1534274988757-a28bf1a57c17?auto=format&fit=crop&w=800&q=75",
-  snow:
+    "https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?auto=format&fit=crop&w=800&q=75",
+  ],
+  snow: [
     "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=800&q=75",
-  fog:
+    "https://images.unsplash.com/photo-1483921020237-2ff51e8e4b22?auto=format&fit=crop&w=800&q=75",
+  ],
+  fog: [
     "https://images.unsplash.com/photo-1487621167305-5d248087c724?auto=format&fit=crop&w=800&q=75",
-  clear:
+    "https://images.unsplash.com/photo-1509114397022-ed747cca3f65?auto=format&fit=crop&w=800&q=75",
+  ],
+  clear: [
     "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=75",
-  clouds:
+    "https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?auto=format&fit=crop&w=800&q=75",
+  ],
+  clouds: [
     "https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=800&q=75",
+    "https://images.unsplash.com/photo-1501630834273-4b5604d2ee31?auto=format&fit=crop&w=800&q=75",
+  ],
 };
 
-// 3. Regional townscape fallback
-function getRegionalArtwork(city: string, country?: string): string {
+// Regional townscape fallback
+function getRegionalArtwork(city: string, country?: string): string[] {
   const text = `${city} ${country || ""}`.toLowerCase();
 
   if (/thailand|vietnam|laos|cambodia|indonesia|malaysia|philippines|myanmar|siam/.test(text)) {
-    return "https://images.unsplash.com/photo-1528181304800-259b08848526?auto=format&fit=crop&w=800&q=75";
+    return [
+      "https://images.unsplash.com/photo-1528181304800-259b08848526?auto=format&fit=crop&w=800&q=75",
+      "https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=800&q=75",
+    ];
   }
   if (/japan|korea|taiwan/.test(text)) {
-    return "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=800&q=75";
+    return [
+      "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=800&q=75",
+      "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=800&q=75",
+    ];
   }
   if (/france|italy|germany|spain|uk|england|britain|europe|austria|switzerland|macedonia/.test(text)) {
-    return "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=800&q=75";
+    return [
+      "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=800&q=75",
+      "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=800&q=75",
+    ];
   }
-  return "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=75";
+  return [
+    "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=75",
+    "https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=800&q=75",
+  ];
 }
 
-// In-memory cache for fast switching during current session
+// In-memory cache for instant switching during the active session
 const loadedImageCache = new Set<string>();
 
-// 4. Preload helper with referrer policy to prevent CDN blocks
+// Preload helper with referrer policy to prevent CDN blocks
 export function preloadImage(url: string, timeoutMs = 8000): Promise<boolean> {
   if (typeof window === "undefined" || !url) return Promise.resolve(false);
   if (loadedImageCache.has(url)) return Promise.resolve(true);
@@ -123,7 +176,7 @@ export function preloadImage(url: string, timeoutMs = 8000): Promise<boolean> {
   });
 }
 
-// 5. Instant atmospheric CSS gradients
+// Instant atmospheric CSS gradients
 export function getInstantBackground(weatherCodeOrIcon: string | number): string {
   const code = Number(weatherCodeOrIcon);
 
@@ -149,82 +202,136 @@ export function getInstantBackground(weatherCodeOrIcon: string | number): string
   return "linear-gradient(135deg, #131c26 0%, #1e2c3c 50%, #2f3e50 100%)";
 }
 
-// 6. Dynamic Wikipedia Landmark Discovery Scanner
-interface WikiPage {
-  pageid: number;
-  title: string;
-  description?: string;
-  thumbnail?: { source: string; width: number; height: number };
+// Client-side Custom User Photo Storage
+export function getSavedUserPhoto(cityName: string): string | null {
+  if (typeof window === "undefined" || !cityName) return null;
+  try {
+    return localStorage.getItem(`weather:user-photo:${cityName.toLowerCase().trim()}`);
+  } catch {
+    return null;
+  }
 }
 
-const LANDMARK_POSITIVE =
-  /temple|monument|park|museum|palace|shrine|castle|tower|mountain|beach|lake|pagoda|cathedral|bridge|garden|landmark|ruin|waterfall|sanctuary|historic|square/i;
-const LANDMARK_NEGATIVE =
-  /railway|station|hospital|clinic|highway|airport|stadium|subway|bus|depot|headquarters|school/i;
-
-async function scanWikipediaLandmarks(
-  lat: number,
-  lon: number,
-  cityName: string
-): Promise<string | null> {
-  if (typeof window === "undefined") return null;
-
-  const cacheKey = `weather:landmark:${cityName.toLowerCase().trim()}`;
+export function saveUserPhoto(cityName: string, dataUrl: string): boolean {
+  if (typeof window === "undefined" || !cityName) return false;
   try {
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) return cached;
-  } catch {}
-
-  try {
-    const url = `https://en.wikipedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${lat}|${lon}&ggsradius=10000&ggslimit=10&prop=pageimages|description&piprop=thumbnail&pithumbsize=1000&format=json&origin=*`;
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    const pages = Object.values((data?.query?.pages || {}) as Record<string, WikiPage>);
-
-    if (!pages.length) return null;
-
-    // Filter pages that actually have a good thumbnail
-    const withImages = pages.filter(
-      (p) => p.thumbnail?.source && (p.thumbnail.width >= 500 || p.thumbnail.height >= 400)
-    );
-
-    if (!withImages.length) return null;
-
-    // Score based on tourist appeal & architectural significance
-    let bestPage: WikiPage = withImages[0];
-    let bestScore = -100;
-
-    for (const p of withImages) {
-      const text = `${p.title} ${p.description || ""}`.toLowerCase();
-      let score = 0;
-
-      if (LANDMARK_POSITIVE.test(text)) score += 50;
-      if (text.includes("province") || text.includes("city") || text.includes("town")) score += 20;
-      if (LANDMARK_NEGATIVE.test(text)) score -= 60;
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestPage = p;
-      }
-    }
-
-    const imageUrl = bestPage.thumbnail?.source;
-    if (imageUrl) {
-      try {
-        localStorage.setItem(cacheKey, imageUrl);
-      } catch {}
-      return imageUrl;
-    }
+    localStorage.setItem(`weather:user-photo:${cityName.toLowerCase().trim()}`, dataUrl);
+    return true;
   } catch {
-    // Network or parse issue — silently fallback
+    return false;
+  }
+}
+
+export function clearUserPhoto(cityName: string): void {
+  if (typeof window === "undefined" || !cityName) return;
+  try {
+    localStorage.removeItem(`weather:user-photo:${cityName.toLowerCase().trim()}`);
+  } catch {}
+}
+
+// Client-side compressor (canvas-based, keeps payload ~100-200kb so it never breaks storage quotas)
+export function compressImageFile(file: File, maxDim = 1200, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas context unavailable"));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve(compressedDataUrl);
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Retrieve list of all available AI/Curated artworks for the current city & weather
+export function getAllAvailableArtworks(
+  cityName: string,
+  weatherCode: string | number,
+  weatherDesc: string,
+  country?: string
+): string[] {
+  const cityKey = cityName.toLowerCase();
+  const descKey = weatherDesc.toLowerCase();
+  const code = Number(weatherCode);
+
+  const list: string[] = [];
+
+  // Check landmark matches
+  for (const [name, urls] of Object.entries(LANDMARK_WATERCOLORS)) {
+    if (cityKey.includes(name)) {
+      list.push(...urls);
+      break;
+    }
   }
 
-  return null;
+  // Weather condition artworks
+  if (code >= 95 || descKey.includes("thunder") || descKey.includes("storm")) {
+    list.push(...WEATHER_WATERCOLORS.thunderstorm);
+  } else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || descKey.includes("rain")) {
+    list.push(...WEATHER_WATERCOLORS.rain);
+  } else if ((code >= 71 && code <= 77) || descKey.includes("snow")) {
+    list.push(...WEATHER_WATERCOLORS.snow);
+  } else if (code === 45 || code === 48 || descKey.includes("fog") || descKey.includes("mist")) {
+    list.push(...WEATHER_WATERCOLORS.fog);
+  } else if (code === 0 || code === 1) {
+    list.push(...WEATHER_WATERCOLORS.clear);
+  } else if (code >= 2 && code <= 3) {
+    list.push(...WEATHER_WATERCOLORS.clouds);
+  }
+
+  // Regional artworks
+  list.push(...getRegionalArtwork(cityName, country));
+
+  // Deduplicate
+  return Array.from(new Set(list));
 }
 
-// 7. Main Background Resolver (Catalog -> Wikipedia Scan -> Weather Scene)
+// User-chosen AI art persistence
+export function getSavedCustomArtChoice(cityName: string): string | null {
+  if (typeof window === "undefined" || !cityName) return null;
+  try {
+    return localStorage.getItem(`weather:custom-art:${cityName.toLowerCase().trim()}`);
+  } catch {
+    return null;
+  }
+}
+
+export function saveCustomArtChoice(cityName: string, url: string): void {
+  if (typeof window === "undefined" || !cityName) return;
+  try {
+    localStorage.setItem(`weather:custom-art:${cityName.toLowerCase().trim()}`, url);
+  } catch {}
+}
+
 export interface BackgroundResult {
   initialBg: string;
   isAi: boolean;
@@ -241,46 +348,29 @@ export async function getCityWeatherBackground(
   lon?: number
 ): Promise<BackgroundResult> {
   const fallbackGradient = getInstantBackground(weatherCode);
-  const cityKey = city.toLowerCase();
-  const descKey = weatherDesc.toLowerCase();
-  const code = Number(weatherCode);
 
-  // 1. Check curated catalog first
-  let targetArtwork = "";
-  for (const [name, url] of Object.entries(LANDMARK_WATERCOLORS)) {
-    if (cityKey.includes(name)) {
-      targetArtwork = url;
-      break;
-    }
+  // 1. Check if user set their own photo
+  const userPhoto = getSavedUserPhoto(city);
+  if (userPhoto) {
+    return { initialBg: userPhoto, isAi: true };
   }
 
-  // 2. Check cached landmark for this city
-  if (!targetArtwork && typeof window !== "undefined") {
-    try {
-      const cached = localStorage.getItem(`weather:landmark:${cityKey.trim()}`);
-      if (cached) targetArtwork = cached;
-    } catch {}
+  // 2. Check if user previously cycled to a specific art choice
+  const savedArtChoice = getSavedCustomArtChoice(city);
+  if (savedArtChoice) {
+    preloadImage(savedArtChoice, 6000).then((ok) => {
+      if (ok && onGenerated) onGenerated(savedArtChoice);
+    });
+    return {
+      initialBg: loadedImageCache.has(savedArtChoice) ? savedArtChoice : fallbackGradient,
+      isAi: loadedImageCache.has(savedArtChoice),
+    };
   }
 
-  // 3. Fallback weather condition artwork if no catalog/cached item
-  let weatherFallback = "";
-  if (code >= 95 || descKey.includes("thunder") || descKey.includes("storm")) {
-    weatherFallback = WEATHER_WATERCOLORS.thunderstorm;
-  } else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || descKey.includes("rain")) {
-    weatherFallback = WEATHER_WATERCOLORS.rain;
-  } else if ((code >= 71 && code <= 77) || descKey.includes("snow")) {
-    weatherFallback = WEATHER_WATERCOLORS.snow;
-  } else if (code === 45 || code === 48 || descKey.includes("fog") || descKey.includes("mist")) {
-    weatherFallback = WEATHER_WATERCOLORS.fog;
-  } else if (code === 0 || code === 1) {
-    weatherFallback = WEATHER_WATERCOLORS.clear;
-  } else if (code >= 2 && code <= 3) {
-    weatherFallback = WEATHER_WATERCOLORS.clouds;
-  } else {
-    weatherFallback = getRegionalArtwork(city, country);
-  }
+  // 3. Fallback to curated catalog
+  const artOptions = getAllAvailableArtworks(city, weatherCode, weatherDesc, country);
+  const targetArtwork = artOptions[0] || "";
 
-  // If we already know the target artwork (catalog or cache), load it
   if (targetArtwork) {
     preloadImage(targetArtwork, 6000).then((ok) => {
       if (ok && onGenerated) onGenerated(targetArtwork);
@@ -289,29 +379,6 @@ export async function getCityWeatherBackground(
       initialBg: loadedImageCache.has(targetArtwork) ? targetArtwork : fallbackGradient,
       isAi: loadedImageCache.has(targetArtwork),
     };
-  }
-
-  // 4. Kick off Wikipedia Landmark Discovery asynchronously for uncataloged cities
-  if (lat !== undefined && lon !== undefined) {
-    scanWikipediaLandmarks(lat, lon, city).then(async (wikiUrl) => {
-      if (wikiUrl) {
-        const loaded = await preloadImage(wikiUrl, 6000);
-        if (loaded && onGenerated) {
-          onGenerated(wikiUrl);
-          return;
-        }
-      }
-      // If no Wikipedia landmark, load weather-themed artwork
-      const weatherLoaded = await preloadImage(weatherFallback, 6000);
-      if (weatherLoaded && onGenerated) {
-        onGenerated(weatherFallback);
-      }
-    });
-  } else {
-    // No coordinates, load weather fallback
-    preloadImage(weatherFallback, 6000).then((loaded) => {
-      if (loaded && onGenerated) onGenerated(weatherFallback);
-    });
   }
 
   return { initialBg: fallbackGradient, isAi: false };
