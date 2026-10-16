@@ -409,19 +409,33 @@ export function WeatherView({
                   {isFav ? "★" : "☆"}
                 </button>
 
-                {/* Direct Art Controls Popover */}
-                <div className="relative inline-block" ref={artMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => setShowArtMenu((prev) => !prev)}
-                    className="flex items-center gap-1 rounded-full border border-white/25 bg-black/35 backdrop-blur-md px-2 py-0.5 text-[11px] font-medium text-white hover:bg-black/55 transition-colors"
-                    title="Change artwork or upload photo"
-                    aria-label="Change artwork or upload photo"
-                  >
-                    <span>🎨</span>
-                    <span>Art</span>
-                    <span className="text-[9px] opacity-70">▾</span>
-                  </button>
+                {/* Direct Art Controls Popover with 1-Tap Next Arrow */}
+                <div className="relative inline-flex items-center" ref={artMenuRef}>
+                  <div className="inline-flex items-center overflow-hidden rounded-full border border-white/25 bg-black/35 backdrop-blur-md text-[11px] font-medium text-white shadow-xs">
+                    <button
+                      type="button"
+                      onClick={() => setShowArtMenu((prev) => !prev)}
+                      className="flex items-center gap-1 px-2 py-0.5 hover:bg-white/15 transition-colors"
+                      title="Artwork options (Upload, Auto)"
+                      aria-label="Artwork options"
+                    >
+                      <span>🎨</span>
+                      <span>Art</span>
+                      <span className="text-[9px] opacity-70">▾</span>
+                    </button>
+
+                    <span className="h-3 w-[1px] bg-white/25" />
+
+                    <button
+                      type="button"
+                      onClick={handleCycleArtwork}
+                      className="flex items-center px-1.5 py-0.5 hover:bg-white/20 active:scale-95 transition-all text-white font-semibold"
+                      title="Next photo"
+                      aria-label="Next photo"
+                    >
+                      <span className="text-xs leading-none">→</span>
+                    </button>
+                  </div>
 
                   {showArtMenu && (
                     <div className="absolute left-0 top-full mt-1.5 z-40 w-48 rounded-xl border border-white/20 bg-slate-900/95 backdrop-blur-md p-1.5 text-xs text-white shadow-2xl ring-1 ring-black/20">
@@ -440,7 +454,7 @@ export function WeatherView({
                         className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-white/10 transition-colors"
                       >
                         <span>🔁</span>
-                        <span>Next artwork</span>
+                        <span>Next artwork (→)</span>
                       </button>
 
                       <button
