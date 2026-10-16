@@ -517,6 +517,49 @@ function evaluateAllDisastersAndAlerts(
   return items;
 }
 
+/**
+ * High-speed, free, client-side reverse geocoder with multi-engine fallback.
+ * Uses Photon (OpenStreetMap) with BigDataCloud fallback.
+ */
+async function reverseGeocode(lat: number, lon: number): Promise<{ name: string; country?: string } | null> {
+  // Strategy 1: Photon / OpenStreetMap (Global, multi-lingual, free, CORS-friendly)
+  try {
+    const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&lang=en`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const feat = data?.features?.[0];
+      if (feat?.properties) {
+        const p = feat.properties;
+        const cityName = p.city || p.town || p.village || p.municipality || p.district || p.county || p.name;
+        if (cityName) {
+          const state = p.state && p.state !== cityName && !p.state.toLowerCase().includes("province") ? p.state : null;
+          const name = state ? `${cityName}, ${state}` : cityName;
+          return { name, country: p.country };
+        }
+      }
+    }
+  } catch {}
+
+  // Strategy 2: BigDataCloud client-side free endpoint
+  try {
+    const res = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`,
+      { signal: AbortSignal.timeout(3500) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const cityName = data.city || data.locality || data.principalSubdivision;
+      if (cityName) {
+        return { name: cityName, country: data.countryName };
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
 function Index() {
   const { t } = useTranslation();
   const [weather, setWeather] = useState<Weather | null>(null);
@@ -720,9 +763,30 @@ function Index() {
   function useLocation() {
     setShowLocDialog(false);
     if (!navigator.geolocation) return setError("Location isn't supported in this browser.");
+    setLoading(true);
+    setError(null);
+
     navigator.geolocation.getCurrentPosition(
-      (p) => load({ name: "My location", lat: +p.coords.latitude.toFixed(3), lon: +p.coords.longitude.toFixed(3) }),
-      () => setError("Location permission was denied. You can search for a city instead."),
+      async (p) => {
+        const lat = +p.coords.latitude.toFixed(3);
+        const lon = +p.coords.longitude.toFixed(3);
+        let placeName = "My location";
+        let countryName: string | undefined;
+
+        try {
+          const geo = await reverseGeocode(lat, lon);
+          if (geo?.name) {
+            placeName = geo.name;
+            countryName = geo.country;
+          }
+        } catch {}
+
+        load({ name: placeName, country: countryName, lat, lon });
+      },
+      () => {
+        setLoading(false);
+        setError("Location permission was denied. You can search for a city instead.");
+      },
       { timeout: 10000 },
     );
   }
@@ -918,8 +982,7 @@ function Index() {
           <div className="max-w-sm rounded-xl bg-card p-6 text-card-foreground shadow-lg">
             <h2 className="text-lg font-semibold">Use your location?</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Your browser will ask for permission. Your coordinates are rounded and sent only to Open-Meteo to get the
-              local forecast. Nothing is stored on any server or shared with anyone else.
+              Your browser will ask for permission. Your coordinates are rounded and used only to identify your local city and fetch the forecast from Open-Meteo. Nothing is stored on any server or shared with anyone else.
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => setShowLocDialog(false)} className="rounded-lg border border-input text-card-foreground px-4 py-2">
