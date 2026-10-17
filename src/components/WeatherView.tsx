@@ -7,6 +7,7 @@ import {
   getAllAvailableArtworks,
   saveCustomArtChoice,
 } from "@/lib/aiWatercolorGenerator";
+import { WeatherIcon } from "@/lib/weatherIcons";
 
 export interface TickerAlertItem {
   icon: string;
@@ -117,80 +118,31 @@ export function WeatherView({
       w.place.country,
       w.place.lat,
       w.place.lon
-    )
-      .then(({ initialBg, isAi }) => {
-        if (!active) return;
-        setHeroBg(initialBg);
-        setIsAiGenerated(isAi);
-        if (isAi) setIsGenerating(false);
-      })
-      .catch(() => {
-        if (active) setIsGenerating(false);
-      });
+    ).then((result) => {
+      if (active && result?.initialBg) {
+        setHeroBg(result.initialBg);
+        setIsAiGenerated(result.isAi);
+        if (result.isAi) {
+          setIsGenerating(false);
+        }
+      }
+    });
 
     return () => {
       active = false;
     };
-  }, [w.place.name, w.place.lat, w.place.lon, w.current.code, d.label, tempC, w.place.country, customPhoto]);
+  }, [w?.place?.name, w.current.code, customPhoto]);
 
-  // Handle local image upload with canvas compression
-  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const MAX_DIM = 1200;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_DIM) {
-            height = Math.round((height * MAX_DIM) / width);
-            width = MAX_DIM;
-          }
-        } else {
-          if (height > MAX_DIM) {
-            width = Math.round((width * MAX_DIM) / height);
-            height = MAX_DIM;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
-        try {
-          localStorage.setItem(`weather:custom-bg:${w.place.name}`, dataUrl);
-        } catch (err) {
-          console.warn("Storage quota exceeded, keeping in session only", err);
-        }
-        setCustomPhoto(dataUrl);
-        setShowArtMenu(false);
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  }
-
-  // Remove custom photo & restore watercolor
-  function handleRemoveCustomPhoto() {
-    try {
-      localStorage.removeItem(`weather:custom-bg:${w.place.name}`);
-    } catch {}
-    setCustomPhoto(null);
+  // Handle Cycling Artwork to the Next Choice
+  const handleCycleArtwork = () => {
+    if (!w?.place?.name) return;
     setShowArtMenu(false);
-  }
 
-  // Cycle to next artwork in the city/weather list
-  function handleCycleArtwork() {
+    // If a custom photo was displayed, remove it to show next artwork
+    if (customPhoto) {
+      handleRemoveCustomPhoto();
+    }
+
     const options = getAllAvailableArtworks(
       w.place.name,
       w.current.code,
@@ -198,27 +150,29 @@ export function WeatherView({
       w.place.country
     );
 
-    if (!options.length) return;
+    if (options.length === 0) return;
 
+    // Find current index and advance by 1
     const currentIdx = options.findIndex((url) => heroBg.includes(url));
-    const nextIdx = (currentIdx + 1) % options.length;
+    const nextIdx = currentIdx >= 0 ? (currentIdx + 1) % options.length : 0;
     const nextUrl = options[nextIdx];
 
     saveCustomArtChoice(w.place.name, nextUrl);
     setHeroBg(nextUrl);
     setIsAiGenerated(true);
-    setIsGenerating(false);
+  };
+
+  // Restore Auto Artwork selection
+  const handleAutoArtwork = () => {
     setShowArtMenu(false);
-  }
-
-  // Restore dynamic auto artwork
-  function handleAutoArtwork() {
-    if (customPhoto) handleRemoveCustomPhoto();
+    if (!w?.place?.name) return;
     try {
-      localStorage.removeItem(`weather:custom-art:${w.place.name.toLowerCase().trim()}`);
+      localStorage.removeItem(`weather:custom-art:${w.place.name}`);
+      localStorage.removeItem(`weather:custom-bg:${w.place.name}`);
     } catch {}
-
+    setCustomPhoto(null);
     setIsGenerating(true);
+
     getCityWeatherBackground(
       w.place.name,
       d.label,
@@ -234,18 +188,69 @@ export function WeatherView({
       w.place.country,
       w.place.lat,
       w.place.lon
-    )
-      .then(({ initialBg, isAi }) => {
-        setHeroBg(initialBg);
-        setIsAiGenerated(isAi);
-        setIsGenerating(false);
-      })
-      .catch(() => setIsGenerating(false));
+    ).then((result) => {
+      if (result?.initialBg) {
+        setHeroBg(result.initialBg);
+        setIsAiGenerated(result.isAi);
+      }
+      setIsGenerating(false);
+    });
+  };
 
+  // Upload user's custom photo (compressed via HTML5 Canvas into localStorage)
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !w?.place?.name) return;
     setShowArtMenu(false);
-  }
 
-  // Tailored clothing advice
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_DIM = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height && width > MAX_DIM) {
+          height = Math.round((height * MAX_DIM) / width);
+          width = MAX_DIM;
+        } else if (height > MAX_DIM) {
+          width = Math.round((width * MAX_DIM) / height);
+          height = MAX_DIM;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+          try {
+            localStorage.setItem(`weather:custom-bg:${w.place.name}`, dataUrl);
+            setCustomPhoto(dataUrl);
+          } catch (err) {
+            console.warn("Storage quota exceeded for custom photo:", err);
+          }
+        }
+      };
+      if (typeof event.target?.result === "string") {
+        img.src = event.target.result;
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveCustomPhoto = () => {
+    setShowArtMenu(false);
+    if (!w?.place?.name) return;
+    try {
+      localStorage.removeItem(`weather:custom-bg:${w.place.name}`);
+    } catch {}
+    setCustomPhoto(null);
+  };
+
+  // What to Wear Advice based on style and weather
   let tailoredAdvice =
     "Comfortable light layers, cotton tee, breathable pants, and easy-walking sneakers.";
 
@@ -424,27 +429,25 @@ export function WeatherView({
                       <span className="text-[9px] opacity-70">▾</span>
                     </button>
 
-                    <span className="h-3 w-[1px] bg-white/25" />
-
                     <button
                       type="button"
                       onClick={handleCycleArtwork}
-                      className="flex items-center px-1.5 py-0.5 hover:bg-white/20 active:scale-95 transition-all text-white font-semibold"
-                      title="Next photo"
+                      className="border-l border-white/20 px-1.5 py-0.5 hover:bg-white/20 active:bg-white/30 transition-colors"
+                      title="Next photo for this city"
                       aria-label="Next photo"
                     >
-                      <span className="text-xs leading-none">→</span>
+                      <span className="text-xs font-bold leading-none">→</span>
                     </button>
                   </div>
 
                   {showArtMenu && (
-                    <div className="absolute left-0 top-full mt-1.5 z-40 w-48 rounded-xl border border-white/20 bg-slate-900/95 backdrop-blur-md p-1.5 text-xs text-white shadow-2xl ring-1 ring-black/20">
+                    <div className="absolute top-full left-0 mt-1.5 z-50 w-48 rounded-xl border border-white/20 bg-slate-900/95 p-1.5 text-xs text-white shadow-2xl backdrop-blur-md animate-in fade-in-50 zoom-in-95">
                       <button
                         type="button"
                         onClick={handleAutoArtwork}
                         className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-white/10 transition-colors"
                       >
-                        <span>🎨</span>
+                        <span>✨</span>
                         <span>Auto (Weather & Landmark)</span>
                       </button>
 
@@ -457,11 +460,11 @@ export function WeatherView({
                         <span>Next artwork (→)</span>
                       </button>
 
+                      <div className="my-1 border-t border-white/10" />
+
                       <button
                         type="button"
-                        onClick={() => {
-                          fileInputRef.current?.click();
-                        }}
+                        onClick={() => fileInputRef.current?.click()}
                         className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-white/10 transition-colors"
                       >
                         <span>📷</span>
@@ -484,9 +487,16 @@ export function WeatherView({
               </div>
 
               <div className="mt-2 flex items-center gap-4">
-                <span className="text-6xl drop-shadow-md" role="img" aria-label={d.label}>
-                  {d.icon}
-                </span>
+                {/* 28-Icon Day/Night/Atmosphere Watercolor Weather Icon */}
+                <WeatherIcon
+                  wmoCode={w.current.code}
+                  isDay={w.current.is_day}
+                  description={d.label}
+                  cityName={w.place.name}
+                  aqi={w.current.aqi}
+                  className="w-16 h-16 sm:w-20 sm:h-20 shrink-0"
+                  fallbackEmoji={d.icon}
+                />
                 <div>
                   <div className="flex items-baseline gap-1">
                     <p className="text-6xl font-bold tracking-tight text-white drop-shadow-md">
@@ -549,13 +559,13 @@ export function WeatherView({
             </span>
           </div>
 
-          <div className="flex items-center gap-1 rounded-lg bg-muted p-0.5 text-xs">
+          <div className="flex gap-1 rounded-lg border border-border/60 bg-muted/50 p-0.5 text-xs">
             {(["casual", "business", "sport"] as const).map((style) => (
               <button
                 key={style}
                 type="button"
                 onClick={() => setWearStyle(style)}
-                className={`rounded-md px-2 py-1 font-medium capitalize transition-all ${
+                className={`rounded-md px-2.5 py-1 font-medium capitalize transition-colors ${
                   wearStyle === style
                     ? "bg-primary text-primary-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
@@ -567,66 +577,68 @@ export function WeatherView({
           </div>
         </div>
 
-        <div className="mt-3 flex items-start gap-3">
-          <span className="text-2xl select-none">
-            {wearStyle === "casual" ? "👟" : wearStyle === "business" ? "💼" : "🏃"}
-          </span>
-          <div className="flex-1">
-            <p className="text-sm leading-relaxed text-foreground/90 font-medium">{tailoredAdvice}</p>
-            <p className="mt-1.5 text-xs text-muted-foreground">
-              💡 {t("best_time")}:{" "}
-              {isRainy
-                ? "Rain expected today. Indoor spots recommended."
-                : tempC > 30
-                  ? "Early morning or after 17:00 when temperatures ease."
-                  : "Midday to afternoon conditions are great for outdoors."}
-            </p>
-          </div>
-        </div>
+        <p className="mt-3 text-sm leading-relaxed font-medium">{tailoredAdvice}</p>
 
-        <div className="mt-3 flex items-center justify-end border-t border-border/40 pt-2 text-xs">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-2.5 text-xs text-muted-foreground">
+          <span>💡 {t("best_time", "Best outdoor window: early morning or post-sunset")}</span>
           <button
             type="button"
             onClick={() => {
-              const text = `Today in ${w.place.name}: ${Math.round(w.current.temp)}${tempSymbol}, ${d.label}. Wear advice: ${tailoredAdvice}`;
+              const text = `Weather in ${w.place.name}: ${Math.round(w.current.temp)}${tempSymbol}, ${d.label}. Wear: ${tailoredAdvice}`;
               if (navigator.share) {
-                navigator.share({ title: "My Weather Pal", text }).catch(() => {});
+                navigator.share({ title: `Weather Outfit - ${w.place.name}`, text }).catch(() => {});
               } else {
-                navigator.clipboard?.writeText(text);
+                navigator.clipboard.writeText(text);
               }
             }}
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-primary hover:bg-primary/10 transition-colors font-medium"
           >
-            <span>📤 Share outfit tip</span>
+            <span>📤</span>
+            <span>Share outfit</span>
           </button>
         </div>
       </section>
 
-      {/* 4. CURRENT METRICS GRID */}
-      <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <p className="text-xs text-muted-foreground">{t("humidity")}</p>
-          <p className="mt-1 text-lg font-bold">{w.current.humidity}%</p>
+      {/* 4. METRICS GRID */}
+      <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-xs font-medium">{t("humidity")}</span>
+            <span className="text-base">💧</span>
+          </div>
+          <p className="mt-1 text-xl font-bold">{w.current.humidity}%</p>
         </div>
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <p className="text-xs text-muted-foreground">{t("wind")}</p>
-          <p className="mt-1 text-lg font-bold">
+
+        <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-xs font-medium">{t("wind")}</span>
+            <span className="text-base">💨</span>
+          </div>
+          <p className="mt-1 text-xl font-bold">
             {Math.round(w.current.wind)} {windUnit}
           </p>
         </div>
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <p className="text-xs text-muted-foreground">{t("uv")}</p>
-          <p className="mt-1 text-lg font-bold">
-            {Math.round(w.current.uvIndex ?? 0)}{" "}
+
+        <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-xs font-medium">{t("uv")}</span>
+            <span className="text-base">☀️</span>
+          </div>
+          <p className="mt-1 text-xl font-bold">
+            {w.current.uvIndex ?? 0}{" "}
             <span className="text-xs font-normal text-muted-foreground">
               ({uvCategory(w.current.uvIndex ?? 0)})
             </span>
           </p>
         </div>
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <p className="text-xs text-muted-foreground">{t("air_quality")}</p>
-          <p className="mt-1 text-lg font-bold">
-            {w.current.aqi !== undefined ? (
+
+        <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-xs font-medium">{t("air_quality")}</span>
+            <span className="text-base">🍃</span>
+          </div>
+          <p className="mt-1 text-xl font-bold">
+            {w.current.aqi ? (
               <>
                 {w.current.aqi}{" "}
                 <span className="text-xs font-normal text-muted-foreground">
@@ -634,27 +646,35 @@ export function WeatherView({
                 </span>
               </>
             ) : (
-              "Good"
+              <span className="text-sm font-normal text-muted-foreground">--</span>
             )}
           </p>
         </div>
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <p className="text-xs text-muted-foreground">{t("precipitation")}</p>
-          <p className="mt-1 text-lg font-bold">
+
+        <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-xs font-medium">{t("precipitation")}</span>
+            <span className="text-base">🌧️</span>
+          </div>
+          <p className="mt-1 text-xl font-bold">
             {w.current.precipitation} {precipUnit}
           </p>
         </div>
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <p className="text-xs text-muted-foreground">{t("sunrise")}</p>
-          <p className="mt-1 text-lg font-bold">{w.sun?.sunrise?.slice(11, 16) || "--:--"}</p>
-        </div>
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <p className="text-xs text-muted-foreground">{t("sunset")}</p>
-          <p className="mt-1 text-lg font-bold">{w.sun?.sunset?.slice(11, 16) || "--:--"}</p>
+
+        <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-xs font-medium">
+              {t("sunrise")} / {t("sunset")}
+            </span>
+            <span className="text-base">🌅</span>
+          </div>
+          <p className="mt-1 text-xs font-semibold sm:text-sm">
+            {w.sun?.sunrise ?? "--:--"} · {w.sun?.sunset ?? "--:--"}
+          </p>
         </div>
       </section>
 
-      {/* 5. HOURLY FORECAST */}
+      {/* 5. HOURLY FORECAST WITH WATERCOLOR ICONS */}
       <section className="mt-4 rounded-xl border border-border/60 bg-card p-4 shadow-xs">
         <h3 className="font-semibold text-sm mb-3">{t("today")}</h3>
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
@@ -666,7 +686,15 @@ export function WeatherView({
                 className="flex w-[72px] shrink-0 flex-col items-center rounded-lg border border-border/40 bg-muted/40 p-2 text-center"
               >
                 <span className="text-xs text-muted-foreground">{h.time.slice(11, 16)}</span>
-                <span className="my-1 text-xl">{hDesc.icon}</span>
+                <div className="my-1 flex h-8 w-8 items-center justify-center">
+                  <WeatherIcon
+                    wmoCode={h.code}
+                    isDay={1}
+                    description={hDesc.label}
+                    className="w-8 h-8"
+                    fallbackEmoji={hDesc.icon}
+                  />
+                </div>
                 <span className="text-sm font-bold">
                   {Math.round(h.temp)}
                   {tempSymbol}
@@ -680,7 +708,7 @@ export function WeatherView({
         </div>
       </section>
 
-      {/* 6. 7-DAY FORECAST */}
+      {/* 6. 7-DAY FORECAST WITH WATERCOLOR ICONS */}
       <section className="mt-4 rounded-xl border border-border/60 bg-card p-4 shadow-xs">
         <h3 className="font-semibold text-sm mb-3">{t("seven_day")}</h3>
         <div className="divide-y divide-border/40">
@@ -696,7 +724,15 @@ export function WeatherView({
               <div key={dItem.date} className="flex items-center justify-between py-2.5 text-sm">
                 <span className="w-16 font-medium">{dayName}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">{dayDesc.icon}</span>
+                  <div className="flex h-7 w-7 items-center justify-center">
+                    <WeatherIcon
+                      wmoCode={dItem.code}
+                      isDay={1}
+                      description={dayDesc.label}
+                      className="w-7 h-7"
+                      fallbackEmoji={dayDesc.icon}
+                    />
+                  </div>
                   <span className="text-xs text-muted-foreground hidden sm:inline">
                     {dayDesc.label}
                   </span>
