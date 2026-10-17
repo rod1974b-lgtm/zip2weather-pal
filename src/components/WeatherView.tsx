@@ -7,7 +7,7 @@ import {
   getAllAvailableArtworks,
   saveCustomArtChoice,
 } from "@/lib/aiWatercolorGenerator";
-import { WeatherIcon } from "@/lib/weatherIcons";
+import { WeatherIcon, wmoToIconCode } from "@/lib/weatherIcons";
 
 export interface TickerAlertItem {
   icon: string;
@@ -46,6 +46,7 @@ export function WeatherView({
 }: WeatherViewProps) {
   const { t } = useTranslation();
   const d = describe(w.current.code);
+  const currentInfo = wmoToIconCode(w.current.code, w.current.is_day ?? 1, w.place.name, w.current.aqi);
   const windUnit = w.unit === "imperial" ? "mph" : "km/h";
   const precipUnit = w.unit === "imperial" ? "in" : "mm";
   const tempSymbol = w.unit === "imperial" ? "°F" : "°C";
@@ -55,7 +56,7 @@ export function WeatherView({
   const [isAiGenerated, setIsAiGenerated] = useState(false);
   const [wearStyle, setWearStyle] = useState<"casual" | "business" | "sport">("casual");
 
-  // Custom photo & Art switcher states (saved per city)
+  // Custom photo & Art switcher states
   const [customPhoto, setCustomPhoto] = useState<string | null>(null);
   const [showArtMenu, setShowArtMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -98,71 +99,59 @@ export function WeatherView({
   // Curated & Dynamic Landmark Scanner Background Effect
   useEffect(() => {
     if (!w?.place?.name) return;
-    if (customPhoto) return; // Custom photo takes precedence
 
-    let active = true;
+    let isMounted = true;
     setIsGenerating(true);
 
-    getCityWeatherBackground(
-      w.place.name,
-      d.label,
-      w.current.code,
-      Math.round(tempC),
-      (aiUrl) => {
-        if (active && aiUrl) {
-          setHeroBg(aiUrl);
-          setIsAiGenerated(true);
-          setIsGenerating(false);
-        }
-      },
-      w.place.country,
-      w.place.lat,
-      w.place.lon
-    ).then((result) => {
-      if (active && result?.initialBg) {
-        setHeroBg(result.initialBg);
-        setIsAiGenerated(result.isAi);
-        if (result.isAi) {
-          setIsGenerating(false);
-        }
-      }
-    });
+    getCityWeatherBackground(w.place.name, w.current.code, w.current.temp, w.unit, w.place.country)
+      .then((art) => {
+        if (!isMounted) return;
+        setHeroBg(art.imageUrl);
+        setIsAiGenerated(art.isAiGenerated);
+        setIsGenerating(false);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setIsGenerating(false);
+      });
 
     return () => {
-      active = false;
+      isMounted = false;
     };
-  }, [w?.place?.name, w.current.code, customPhoto]);
+  }, [w?.place?.name, w?.current?.code]);
 
-  // Handle Cycling Artwork to the Next Choice
-  const handleCycleArtwork = () => {
+  // Cycle through next artwork
+  const handleCycleArtwork = async () => {
     if (!w?.place?.name) return;
-    setShowArtMenu(false);
+    setIsGenerating(true);
 
-    // If a custom photo was displayed, remove it to show next artwork
-    if (customPhoto) {
-      handleRemoveCustomPhoto();
+    try {
+      const available = await getAllAvailableArtworks(
+        w.place.name,
+        w.current.code,
+        w.current.temp,
+        w.unit,
+        w.place.country
+      );
+
+      if (available.length > 0) {
+        const currentIndex = available.findIndex((item) => item.imageUrl === heroBg);
+        const nextIndex = (currentIndex + 1) % available.length;
+        const nextArt = available[nextIndex];
+
+        setHeroBg(nextArt.imageUrl);
+        setIsAiGenerated(nextArt.isAiGenerated);
+        saveCustomArtChoice(w.place.name, nextArt.imageUrl);
+      }
+    } catch (err) {
+      console.warn("Could not cycle artwork:", err);
+    } finally {
+      setIsGenerating(false);
+      setShowArtMenu(false);
     }
-
-    const options = getAllAvailableArtworks(
-      w.place.name,
-      w.current.code,
-      d.label,
-      w.place.country
-    );
-
-    if (options.length === 0) return;
-
-    // Find current index and advance by 1
-    const currentIdx = options.findIndex((url) => heroBg.includes(url));
-    const nextIdx = currentIdx >= 0 ? (currentIdx + 1) % options.length : 0;
-    const nextUrl = options[nextIdx];
-
-    saveCustomArtChoice(w.place.name, nextUrl);
-    setHeroBg(nextUrl);
-    setIsAiGenerated(true);
   };
 
-  // Restore Auto Artwork selection
+  // Reset to auto artwork
   const handleAutoArtwork = () => {
     setShowArtMenu(false);
     if (!w?.place?.name) return;
@@ -172,32 +161,15 @@ export function WeatherView({
     } catch {}
     setCustomPhoto(null);
     setIsGenerating(true);
-
-    getCityWeatherBackground(
-      w.place.name,
-      d.label,
-      w.current.code,
-      Math.round(tempC),
-      (aiUrl) => {
-        if (aiUrl) {
-          setHeroBg(aiUrl);
-          setIsAiGenerated(true);
-          setIsGenerating(false);
-        }
-      },
-      w.place.country,
-      w.place.lat,
-      w.place.lon
-    ).then((result) => {
-      if (result?.initialBg) {
-        setHeroBg(result.initialBg);
-        setIsAiGenerated(result.isAi);
-      }
-      setIsGenerating(false);
-    });
+    getCityWeatherBackground(w.place.name, w.current.code, w.current.temp, w.unit, w.place.country)
+      .then((art) => {
+        setHeroBg(art.imageUrl);
+        setIsAiGenerated(art.isAiGenerated);
+      })
+      .finally(() => setIsGenerating(false));
   };
 
-  // Upload user's custom photo (compressed via HTML5 Canvas into localStorage)
+  // Upload user's custom photo
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !w?.place?.name) return;
@@ -248,6 +220,13 @@ export function WeatherView({
       localStorage.removeItem(`weather:custom-bg:${w.place.name}`);
     } catch {}
     setCustomPhoto(null);
+  };
+
+  // Helper: Determine if an hourly timestamp is daytime using sunrise/sunset
+  const isHourDaytime = (timeIso: string): number => {
+    if (!w?.sun?.sunrise || !w?.sun?.sunset) return 1;
+    const hourStr = timeIso.slice(11, 16);
+    return hourStr >= w.sun.sunrise && hourStr < w.sun.sunset ? 1 : 0;
   };
 
   // What to Wear Advice based on style and weather
@@ -346,23 +325,17 @@ export function WeatherView({
                   }`}
                 />
               </span>
-              <span>
-                {hasDisaster
-                  ? "🚨 DISASTERS TICKER"
-                  : hasWarning
-                  ? "⚠️ ALERTS TICKER"
-                  : "⚡ ADVISORY TICKER"}
-              </span>
+              <span>{hasDisaster ? "Emergency Alert" : "Advisories"}</span>
             </div>
 
-            <div className="relative flex-1 overflow-hidden py-2">
-              <div className="weather-ticker-track flex w-max items-center gap-8 whitespace-nowrap hover:[animation-play-state:paused]">
-                {disasters.concat(disasters).map((item, idx) => (
-                  <span key={idx} className="inline-flex items-center gap-1.5 text-card-foreground">
-                    <span className="text-sm">{item.icon}</span>
-                    <span className="font-semibold text-foreground">[{item.tag}]:</span>
-                    <span className="font-medium">{item.text}</span>
-                    <span className="font-light text-muted-foreground/50">✦</span>
+            <div className="relative flex-1 overflow-hidden whitespace-nowrap py-2 group">
+              <div className="flex w-max animate-ticker items-center group-hover:[animation-play-state:paused]">
+                {disasters.concat(disasters).map((alert, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-2 px-4 font-medium">
+                    <span className="text-sm">{alert.icon}</span>
+                    <span className="font-semibold underline decoration-dotted">{alert.tag}:</span>
+                    <span>{alert.text}</span>
+                    <span className="mx-2 text-muted-foreground/60">•</span>
                   </span>
                 ))}
               </div>
@@ -371,84 +344,74 @@ export function WeatherView({
         </section>
       ) : (
         <section className="mt-3">
-          <div className="flex w-full min-h-[56px] flex-wrap items-center overflow-visible rounded-xl bg-green-500 px-4 py-3 text-xs shadow-xs">
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-medium leading-[18px] text-white break-words whitespace-normal">
-                🛡️ All clear - No severe weather expected in your area today. Enjoy your day!
-              </div>
-            </div>
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300 shadow-xs">
+            <span className="text-base">🛡️</span>
+            <span className="font-bold uppercase tracking-wider text-[11px]">ALL CLEAR</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="truncate">No active severe weather or disaster alerts for this area.</span>
           </div>
         </section>
       )}
 
-      {/* 2. HERO CARD WITH VIBRANT ART, DIRECT ART CONTROLS & SPINNER */}
+      {/* 2. HERO WEATHER CARD */}
       <section
-        className="relative mt-4 overflow-hidden rounded-2xl p-6 text-white shadow-lg transition-all duration-700 bg-slate-900 min-h-[190px]"
         style={bgStyle}
+        className="relative mt-4 overflow-hidden rounded-2xl bg-slate-900 min-h-[190px] border border-white/10 shadow-lg text-white transition-all duration-700"
       >
-        <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/25 z-0" />
 
-        {/* Spinner while discovering or downloading art */}
-        {!customPhoto && isGenerating && (
-          <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-md shadow-sm">
-            <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-            <span>Scanning landmark art…</span>
-          </div>
-        )}
-
-        <div className="relative z-10">
+        <div className="relative z-10 p-5 flex flex-col justify-between min-h-[190px]">
+          {/* Top row: City Name, Favorite, Art Controls */}
           <div className="flex items-start justify-between gap-2">
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-sm font-medium text-slate-100 drop-shadow-sm">
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-bold tracking-tight text-white drop-shadow-md">
                   {w.place.name}
                   {w.place.country ? `, ${w.place.country}` : ""}
-                </p>
+                </h2>
                 <button
                   type="button"
                   onClick={onToggleFav}
-                  className="text-base text-yellow-400 hover:scale-110 transition-transform"
-                  title={isFav ? "Remove from favorites" : "Save to favorites"}
-                  aria-label={isFav ? "Remove from favorites" : "Save to favorites"}
+                  title={isFav ? "Remove favorite" : "Add favorite"}
+                  aria-label={isFav ? "Remove favorite" : "Add favorite"}
+                  className="text-lg transition-transform hover:scale-110 active:scale-95"
                 >
-                  {isFav ? "★" : "☆"}
+                  {isFav ? "⭐" : "☆"}
                 </button>
 
-                {/* Direct Art Controls Popover with 1-Tap Next Arrow */}
-                <div className="relative inline-flex items-center" ref={artMenuRef}>
-                  <div className="inline-flex items-center overflow-hidden rounded-full border border-white/25 bg-black/35 backdrop-blur-md text-[11px] font-medium text-white shadow-xs">
+                {/* 🎨 Art Dropdown & Split-Pill Next Arrow */}
+                <div className="relative" ref={artMenuRef}>
+                  <div className="inline-flex items-center rounded-full border border-white/20 bg-black/40 backdrop-blur-md shadow-xs text-xs text-white">
                     <button
                       type="button"
-                      onClick={() => setShowArtMenu((prev) => !prev)}
-                      className="flex items-center gap-1 px-2 py-0.5 hover:bg-white/15 transition-colors"
-                      title="Artwork options (Upload, Auto)"
-                      aria-label="Artwork options"
+                      onClick={() => setShowArtMenu(!showArtMenu)}
+                      className="flex items-center gap-1 px-2.5 py-1 hover:bg-white/10 transition-colors rounded-l-full"
+                      title="Art options"
                     >
                       <span>🎨</span>
-                      <span>Art</span>
+                      <span className="font-medium text-[11px]">Art</span>
                       <span className="text-[9px] opacity-70">▾</span>
                     </button>
-
                     <button
                       type="button"
                       onClick={handleCycleArtwork}
-                      className="border-l border-white/20 px-1.5 py-0.5 hover:bg-white/20 active:bg-white/30 transition-colors"
-                      title="Next photo for this city"
-                      aria-label="Next photo"
+                      className="px-2 py-1 border-l border-white/20 hover:bg-white/15 transition-colors rounded-r-full font-bold text-xs"
+                      title="Next artwork"
                     >
-                      <span className="text-xs font-bold leading-none">→</span>
+                      →
                     </button>
                   </div>
 
+                  {/* Art Popover Menu */}
                   {showArtMenu && (
-                    <div className="absolute top-full left-0 mt-1.5 z-50 w-48 rounded-xl border border-white/20 bg-slate-900/95 p-1.5 text-xs text-white shadow-2xl backdrop-blur-md animate-in fade-in-50 zoom-in-95">
+                    <div className="absolute left-0 mt-1.5 w-48 rounded-xl border border-white/15 bg-slate-900/95 p-1.5 text-xs text-white shadow-2xl backdrop-blur-xl z-50">
                       <button
                         type="button"
                         onClick={handleAutoArtwork}
                         className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-white/10 transition-colors"
                       >
                         <span>✨</span>
-                        <span>Auto (Weather & Landmark)</span>
+                        <span>Auto (Weather match)</span>
                       </button>
 
                       <button
@@ -456,7 +419,7 @@ export function WeatherView({
                         onClick={handleCycleArtwork}
                         className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-white/10 transition-colors"
                       >
-                        <span>🔁</span>
+                        <span>🔄</span>
                         <span>Next artwork (→)</span>
                       </button>
 
@@ -486,12 +449,12 @@ export function WeatherView({
                 </div>
               </div>
 
+              {/* Main Weather Icon + Temp + Condition */}
               <div className="mt-2 flex items-center gap-4">
-                {/* 28-Icon Day/Night/Atmosphere Watercolor Weather Icon */}
                 <WeatherIcon
                   wmoCode={w.current.code}
                   isDay={w.current.is_day}
-                  description={d.label}
+                  description={currentInfo.desc}
                   cityName={w.place.name}
                   aqi={w.current.aqi}
                   className="w-16 h-16 sm:w-20 sm:h-20 shrink-0"
@@ -507,7 +470,7 @@ export function WeatherView({
                     </span>
                   </div>
                   <p className="text-sm text-slate-200 drop-shadow-sm">
-                    {d.label} · {t("feels_like")} {Math.round(w.current.feels)}
+                    {currentInfo.desc} · {t("feels_like")} {Math.round(w.current.feels)}
                     {tempSymbol}
                   </p>
                 </div>
@@ -520,9 +483,7 @@ export function WeatherView({
               disabled={refreshing}
               title="Refresh forecast"
               aria-label="Refresh forecast"
-              className={`flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/30 backdrop-blur-md px-2.5 py-1 text-xs text-white hover:bg-black/50 transition-colors ${
-                !customPhoto && isGenerating ? "mt-7" : ""
-              }`}
+              className="flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/30 backdrop-blur-md px-2.5 py-1 text-xs text-white hover:bg-black/50 transition-colors"
             >
               <span className={`inline-block ${refreshing ? "animate-spin" : ""}`}>🔄</span>
               <span>{formatTimeAgo(w.fetchedAt)}</span>
@@ -578,98 +539,56 @@ export function WeatherView({
         </div>
 
         <p className="mt-3 text-sm leading-relaxed font-medium">{tailoredAdvice}</p>
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-2.5 text-xs text-muted-foreground">
-          <span>💡 {t("best_time", "Best outdoor window: early morning or post-sunset")}</span>
-          <button
-            type="button"
-            onClick={() => {
-              const text = `Weather in ${w.place.name}: ${Math.round(w.current.temp)}${tempSymbol}, ${d.label}. Wear: ${tailoredAdvice}`;
-              if (navigator.share) {
-                navigator.share({ title: `Weather Outfit - ${w.place.name}`, text }).catch(() => {});
-              } else {
-                navigator.clipboard.writeText(text);
-              }
-            }}
-            className="flex items-center gap-1 rounded-md px-2 py-1 text-primary hover:bg-primary/10 transition-colors font-medium"
-          >
-            <span>📤</span>
-            <span>Share outfit</span>
-          </button>
-        </div>
       </section>
 
-      {/* 4. METRICS GRID */}
+      {/* 4. KEY METRICS GRID */}
       <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-medium">{t("humidity")}</span>
-            <span className="text-base">💧</span>
-          </div>
-          <p className="mt-1 text-xl font-bold">{w.current.humidity}%</p>
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
+          <span className="text-xs text-muted-foreground">{t("humidity")}</span>
+          <p className="mt-1 text-2xl font-bold">{Math.round(w.current.humidity)}%</p>
         </div>
 
-        <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-medium">{t("wind")}</span>
-            <span className="text-base">💨</span>
-          </div>
-          <p className="mt-1 text-xl font-bold">
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
+          <span className="text-xs text-muted-foreground">{t("wind")}</span>
+          <p className="mt-1 text-2xl font-bold">
             {Math.round(w.current.wind)} {windUnit}
           </p>
         </div>
 
-        <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-medium">{t("uv")}</span>
-            <span className="text-base">☀️</span>
-          </div>
-          <p className="mt-1 text-xl font-bold">
-            {w.current.uvIndex ?? 0}{" "}
-            <span className="text-xs font-normal text-muted-foreground">
-              ({uvCategory(w.current.uvIndex ?? 0)})
-            </span>
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
+          <span className="text-xs text-muted-foreground">{t("uv")}</span>
+          <p className="mt-1 text-2xl font-bold">
+            {w.current.uvIndex} <span className="text-xs font-normal">({uvCategory(w.current.uvIndex)})</span>
           </p>
         </div>
 
-        <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-medium">{t("air_quality")}</span>
-            <span className="text-base">🍃</span>
-          </div>
-          <p className="mt-1 text-xl font-bold">
-            {w.current.aqi ? (
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
+          <span className="text-xs text-muted-foreground">{t("air_quality")}</span>
+          <p className="mt-1 text-2xl font-bold">
+            {w.current.aqi !== undefined ? (
               <>
                 {w.current.aqi}{" "}
-                <span className="text-xs font-normal text-muted-foreground">
+                <span className={`text-xs font-semibold ${aqiCategory(w.current.aqi).color}`}>
                   ({aqiCategory(w.current.aqi).label})
                 </span>
               </>
             ) : (
-              <span className="text-sm font-normal text-muted-foreground">--</span>
+              "--"
             )}
           </p>
         </div>
 
-        <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-medium">{t("precipitation")}</span>
-            <span className="text-base">🌧️</span>
-          </div>
-          <p className="mt-1 text-xl font-bold">
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
+          <span className="text-xs text-muted-foreground">{t("precipitation")}</span>
+          <p className="mt-1 text-2xl font-bold">
             {w.current.precipitation} {precipUnit}
           </p>
         </div>
 
-        <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-medium">
-              {t("sunrise")} / {t("sunset")}
-            </span>
-            <span className="text-base">🌅</span>
-          </div>
-          <p className="mt-1 text-xs font-semibold sm:text-sm">
-            {w.sun?.sunrise ?? "--:--"} · {w.sun?.sunset ?? "--:--"}
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
+          <span className="text-xs text-muted-foreground">{t("sunrise")} / {t("sunset")}</span>
+          <p className="mt-1 text-base font-semibold">
+            {w.sun?.sunrise || "--:--"} · {w.sun?.sunset || "--:--"}
           </p>
         </div>
       </section>
@@ -679,28 +598,30 @@ export function WeatherView({
         <h3 className="font-semibold text-sm mb-3">{t("today")}</h3>
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
           {w.hourly.slice(0, 24).map((h, i) => {
-            const hDesc = describe(h.code);
+            const hourIsDay = isHourDaytime(h.time);
+            const hourInfo = wmoToIconCode(h.code, hourIsDay, w.place.name);
+            const hEmoji = describe(h.code).icon;
             return (
               <div
                 key={i}
-                className="flex w-[72px] shrink-0 flex-col items-center rounded-lg border border-border/40 bg-muted/40 p-2 text-center"
+                className="flex w-[74px] shrink-0 flex-col items-center rounded-lg border border-border/40 bg-muted/40 p-2 text-center"
               >
                 <span className="text-xs text-muted-foreground">{h.time.slice(11, 16)}</span>
                 <div className="my-1 flex h-8 w-8 items-center justify-center">
                   <WeatherIcon
                     wmoCode={h.code}
-                    isDay={1}
-                    description={hDesc.label}
+                    isDay={hourIsDay}
+                    description={hourInfo.desc}
                     className="w-8 h-8"
-                    fallbackEmoji={hDesc.icon}
+                    fallbackEmoji={hEmoji}
                   />
                 </div>
                 <span className="text-sm font-bold">
                   {Math.round(h.temp)}
                   {tempSymbol}
                 </span>
-                <span className="mt-1 text-[10px] text-muted-foreground line-clamp-2 break-words">
-                  {hDesc.label}
+                <span className="mt-1 text-[10px] text-muted-foreground line-clamp-2 break-words leading-tight">
+                  {hourInfo.desc}
                 </span>
               </div>
             );
@@ -713,7 +634,8 @@ export function WeatherView({
         <h3 className="font-semibold text-sm mb-3">{t("seven_day")}</h3>
         <div className="divide-y divide-border/40">
           {w.daily.map((dItem, i) => {
-            const dayDesc = describe(dItem.code);
+            const dayInfo = wmoToIconCode(dItem.code, 1, w.place.name);
+            const dayEmoji = describe(dItem.code).icon;
             const dayName =
               i === 0
                 ? "Today"
@@ -728,13 +650,13 @@ export function WeatherView({
                     <WeatherIcon
                       wmoCode={dItem.code}
                       isDay={1}
-                      description={dayDesc.label}
+                      description={dayInfo.desc}
                       className="w-7 h-7"
-                      fallbackEmoji={dayDesc.icon}
+                      fallbackEmoji={dayEmoji}
                     />
                   </div>
                   <span className="text-xs text-muted-foreground hidden sm:inline">
-                    {dayDesc.label}
+                    {dayInfo.desc}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -783,20 +705,6 @@ export function WeatherView({
           NWS
         </a>
       </p>
-
-      {/* 35s ticker animation styling */}
-      <style>{`
-        @keyframes weatherTickerAnimation {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .weather-ticker-track {
-          animation: weatherTickerAnimation 35s linear infinite;
-        }
-        .weather-ticker-track:hover {
-          animation-play-state: paused;
-        }
-      `}</style>
     </>
   );
 }
