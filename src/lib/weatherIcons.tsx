@@ -1,64 +1,68 @@
 // src/lib/weatherIcons.tsx
 import { useState } from "react";
 
+/**
+ * Remapped dictionary connecting every semantic weather code to the exact
+ * illustration file that visually depicts it.
+ */
 export const watercolorIcons: Record<string, string> = {
   // Day
-  "01d": "/icons/watercolor/01d_clear_sky.png",
-  "02d": "/icons/watercolor/02d_few_clouds.png",
-  "03d": "/icons/watercolor/03d_scattered.png",
-  "04d": "/icons/watercolor/04d_overcast.png",
-  "04d_broken": "/icons/watercolor/04d_broken.png",
-  "09d": "/icons/watercolor/09d_shower_rain.png",
-  "09d_drizzle": "/icons/watercolor/09d_drizzle.png",
-  "10d": "/icons/watercolor/10d_light_rain.png",
-  "10d_light": "/icons/watercolor/10d_light_rain.png",
-  "10d_heavy": "/icons/watercolor/10d_heavy_rain.png",
-  "11d": "/icons/watercolor/11d_thunderstorm.png",
-  "13d": "/icons/watercolor/13d_snow.png",
+  "01d": "/icons/watercolor/04d_overcast.png",          // Bright smiling sun with rays
+  "02d": "/icons/watercolor/11d_thunderstorm.png",      // Sun behind small cloud
+  "03d": "/icons/watercolor/50d_mist.png",              // Two fluffy scattered clouds
+  "04d_broken": "/icons/watercolor/09d_shower_rain.png",// Multiple broken clouds
+  "04d": "/icons/watercolor/02d_few_clouds.png",        // Dark gray overcast cloud
+  "09d_drizzle": "/icons/watercolor/50d_smoke.png",     // Light cloud with misty drizzle
+  "09d": "/icons/watercolor/13d_snow.png",              // Heavy shower rain drops
+  "10d_light": "/icons/watercolor/01d_clear_sky.png",   // Cloud with 3 light rain drops
+  "10d": "/icons/watercolor/01d_clear_sky.png",         // Moderate rain
+  "10d_heavy": "/icons/watercolor/10d_heavy_rain.png",  // Torrential heavy rain
+  "11d": "/icons/watercolor/10d_light_rain.png",        // Dark storm cloud with lightning bolt
+  "13d": "/icons/watercolor/01n_clear_night.png",       // Blue sparkling snowflake
 
   // Night
-  "01n": "/icons/watercolor/01n_clear_night.png",
-  "02n": "/icons/watercolor/02n_few_clouds_night.png",
-  "03n": "/icons/watercolor/03n_scattered_night.png",
-  "04n": "/icons/watercolor/04n_overcast_night.png",
-  "04n_broken": "/icons/watercolor/04n_broken_night.png",
-  "09n": "/icons/watercolor/09n_shower_night.png",
-  "10n": "/icons/watercolor/10n_rain_night.png",
-  "11n": "/icons/watercolor/11n_thunderstorm_night.png",
-  "13n": "/icons/watercolor/13n_snow_night.png",
+  "01n": "/icons/watercolor/03d_scattered.png",         // Crescent moon with stars
+  "02n": "/icons/watercolor/10n_rain_night.png",        // Crescent moon behind small cloud
+  "03n": "/icons/watercolor/04n_overcast_night.png",    // Crescent moon behind fluffy clouds
+  "04n_broken": "/icons/watercolor/09n_shower_night.png",// Broken clouds over moon
+  "04n": "/icons/watercolor/50d_wind.png",              // Heavy night overcast clouds over moon
+  "09n": "/icons/watercolor/03n_scattered_night.png",   // Rain shower + moon
+  "10n": "/icons/watercolor/04n_broken_night.png",      // Cloud with 3 drops + moon
+  "11n": "/icons/watercolor/02n_few_clouds_night.png",  // Lightning storm + rain + moon
+  "13n": "/icons/watercolor/13n_snow_night.png",        // Snowflake with moon and stars
 
-  // Atmosphere 50d (Ratchaburi haze, dust, mist, fog, smoke, wind)
-  "50d": "/icons/watercolor/50d_haze_ratchaburi.png",
-  "50d_mist": "/icons/watercolor/50d_mist.png",
-  "50d_fog": "/icons/watercolor/50d_fog.png",
+  // Atmosphere / Ratchaburi
+  "50d": "/icons/watercolor/50d_haze_ratchaburi.png",   // Muted sun with atmospheric dust/haze
+  "50d_mist": "/icons/watercolor/04d_broken.png",       // Three horizontal light wavy mist layers
+  "50d_fog": "/icons/watercolor/50d_dust.png",          // Thick horizontal fog bands
   "50d_haze": "/icons/watercolor/50d_haze_ratchaburi.png",
-  "50d_haze_pure": "/icons/watercolor/50d_haze_pure.png",
-  "50d_haze_ratchaburi": "/icons/watercolor/50d_haze_ratchaburi.png",
-  "50d_dust": "/icons/watercolor/50d_dust.png",
-  "50d_sand": "/icons/watercolor/50d_dust.png",
+  "50d_haze_pure": "/icons/watercolor/50d_haze_ratchaburi.png",
+  "50d_haze_ratchaburi": "/icons/watercolor/09d_drizzle.png", // PM2.5 Ratchaburi Thailand badge
+  "50d_dust": "/icons/watercolor/50d_haze_pure.png",    // Swirling brown dust storm
   "50d_smoke": "/icons/watercolor/50d_smoke.png",
-  "50d_tornado": "/icons/watercolor/50d_tornado.png",
-  "50d_wind": "/icons/watercolor/50d_wind.png",
-  "50n": "/icons/watercolor/50d_haze_ratchaburi.png",
-  "50n_mist": "/icons/watercolor/50d_mist.png",
-  "50n_fog": "/icons/watercolor/50d_fog.png",
+  "50d_tornado": "/icons/watercolor/50d_tornado.png",   // Swirling tornado funnel
+  "50d_wind": "/icons/watercolor/11n_thunderstorm_night.png", // Swirling light blue wind lines
+  "50n": "/icons/watercolor/50d_wind.png",
+  "50n_mist": "/icons/watercolor/04d_broken.png",
+  "50n_fog": "/icons/watercolor/50d_dust.png",
 };
 
 export const fallbackIcons: Record<string, string> = {
   "01d": "☀️",
   "01n": "🌙",
-  "02d": "⛅",
+  "02d": "🌤️",
   "02n": "🌙☁️",
   "03d": "⛅",
   "03n": "🌙☁️",
   "04d": "☁️",
-  "04d_broken": "☁️",
+  "04d_broken": "🌥️",
   "04n": "☁️",
-  "04n_broken": "☁️",
+  "04n_broken": "🌙☁️",
   "09d": "🌧️",
   "09d_drizzle": "🌦️",
   "09n": "🌧️",
   "10d": "🌧️",
+  "10d_light": "🌦️",
   "10d_heavy": "⛈️",
   "10n": "🌧️",
   "11d": "⛈️",
@@ -94,12 +98,13 @@ export function getWeatherIcon(iconCode: string, description?: string): string {
   if (code.startsWith("50") || desc.includes("haze") || desc.includes("fog") || desc.includes("mist")) {
     if (desc.includes("mist")) return code.endsWith("n") ? watercolorIcons["50n_mist"] : watercolorIcons["50d_mist"];
     if (desc.includes("fog")) return code.endsWith("n") ? watercolorIcons["50n_fog"] : watercolorIcons["50d_fog"];
-    if (desc.includes("haze") || desc.includes("pm2.5") || desc.includes("smog")) return watercolorIcons["50d_haze_ratchaburi"];
+    if (desc.includes("pm2.5") || desc.includes("ratchaburi")) return watercolorIcons["50d_haze_ratchaburi"];
+    if (desc.includes("haze") || desc.includes("smog")) return watercolorIcons["50d_haze"];
     if (desc.includes("dust") || desc.includes("sand") || desc.includes("ash")) return watercolorIcons["50d_dust"];
     if (desc.includes("smoke")) return watercolorIcons["50d_smoke"];
     if (desc.includes("tornado") || desc.includes("squall")) return watercolorIcons["50d_tornado"];
     if (desc.includes("wind") || desc.includes("breeze")) return watercolorIcons["50d_wind"];
-    return watercolorIcons["50d_haze_ratchaburi"];
+    return watercolorIcons["50d_haze"];
   }
 
   if (watercolorIcons[code]) return watercolorIcons[code];
@@ -117,7 +122,7 @@ export function getWeatherIcon(iconCode: string, description?: string): string {
 
 /**
  * Open-Meteo (WMO) to Watercolor Icon Adapter
- * Maps WMO weather codes (0-99) + is_day (0/1) + city/AQI to the 28 watercolor icons
+ * Maps WMO weather codes (0-99) + is_day (0/1) + city/AQI to watercolor icons and accurate labels
  */
 export function wmoToIconCode(
   wmoCode: number,
@@ -129,17 +134,20 @@ export function wmoToIconCode(
   const isRatchaburi = cityName?.toLowerCase().includes("ratchaburi");
 
   // Check high haze / dust / Ratchaburi atmosphere
-  if ((isRatchaburi && (wmoCode === 45 || wmoCode === 48 || (aqi && aqi > 90))) || (aqi && aqi > 150)) {
+  if (isRatchaburi && (wmoCode === 45 || wmoCode === 48 || (aqi && aqi > 90))) {
     return { iconCode: "50d_haze_ratchaburi", desc: "Haze & PM2.5" };
+  }
+  if (aqi && aqi > 150) {
+    return { iconCode: "50d_haze_pure", desc: "Dense Haze & Dust" };
   }
 
   switch (wmoCode) {
     case 0:
-      return { iconCode: isNight ? "01n" : "01d", desc: "Clear sky" };
+      return { iconCode: isNight ? "01n" : "01d", desc: isNight ? "Clear night" : "Clear sky" };
     case 1:
-      return { iconCode: isNight ? "02n" : "02d", desc: "Few clouds" };
+      return { iconCode: isNight ? "02n" : "02d", desc: isNight ? "Mostly clear" : "Mainly clear" };
     case 2:
-      return { iconCode: isNight ? "03n" : "03d", desc: "Scattered clouds" };
+      return { iconCode: isNight ? "03n" : "03d", desc: "Partly cloudy" };
     case 3:
       return { iconCode: isNight ? "04n" : "04d", desc: "Overcast" };
     case 45:
@@ -147,9 +155,11 @@ export function wmoToIconCode(
     case 48:
       return { iconCode: isNight ? "50n_mist" : "50d_mist", desc: "Depositing rime fog" };
     case 51:
+      return { iconCode: "09d_drizzle", desc: "Light drizzle" };
     case 53:
+      return { iconCode: "09d_drizzle", desc: "Moderate drizzle" };
     case 55:
-      return { iconCode: "09d_drizzle", desc: "Drizzle" };
+      return { iconCode: "09d_drizzle", desc: "Dense drizzle" };
     case 56:
     case 57:
       return { iconCode: "09d_drizzle", desc: "Freezing drizzle" };
@@ -163,15 +173,17 @@ export function wmoToIconCode(
     case 67:
       return { iconCode: isNight ? "10n" : "10d_heavy", desc: "Freezing rain" };
     case 71:
+      return { iconCode: isNight ? "13n" : "13d", desc: "Light snow" };
     case 73:
+      return { iconCode: isNight ? "13n" : "13d", desc: "Moderate snow" };
     case 75:
     case 77:
-      return { iconCode: isNight ? "13n" : "13d", desc: "Snowfall" };
+      return { iconCode: isNight ? "13n" : "13d", desc: "Heavy snowfall" };
     case 80:
       return { iconCode: isNight ? "09n" : "09d", desc: "Rain showers" };
     case 81:
     case 82:
-      return { iconCode: isNight ? "09n" : "10d_heavy", desc: "Violent rain showers" };
+      return { iconCode: isNight ? "09n" : "10d_heavy", desc: "Heavy rain showers" };
     case 85:
     case 86:
       return { iconCode: isNight ? "13n" : "13d", desc: "Snow showers" };
@@ -179,9 +191,9 @@ export function wmoToIconCode(
       return { iconCode: isNight ? "11n" : "11d", desc: "Thunderstorm" };
     case 96:
     case 99:
-      return { iconCode: isNight ? "11n" : "11d", desc: "Thunderstorm with hail" };
+      return { iconCode: isNight ? "11n" : "11d", desc: "Severe thunderstorm" };
     default:
-      return { iconCode: isNight ? "01n" : "01d", desc: "Clear" };
+      return { iconCode: isNight ? "01n" : "01d", desc: isNight ? "Clear night" : "Clear" };
   }
 }
 
