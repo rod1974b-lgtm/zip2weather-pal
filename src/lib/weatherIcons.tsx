@@ -31,13 +31,13 @@ export const watercolorIcons: Record<string, string> = {
   "11n": "/icons/watercolor/02n_few_clouds_night.png",  // Lightning storm + rain + moon
   "13n": "/icons/watercolor/13n_snow_night.png",        // Snowflake with moon and stars
 
-  // Atmosphere / Ratchaburi
+  // Atmosphere / Haze
   "50d": "/icons/watercolor/50d_haze_ratchaburi.png",   // Muted sun with atmospheric dust/haze
   "50d_mist": "/icons/watercolor/04d_broken.png",       // Three horizontal light wavy mist layers
   "50d_fog": "/icons/watercolor/50d_dust.png",          // Thick horizontal fog bands
   "50d_haze": "/icons/watercolor/50d_haze_ratchaburi.png",
   "50d_haze_pure": "/icons/watercolor/50d_haze_ratchaburi.png",
-  "50d_haze_ratchaburi": "/icons/watercolor/09d_drizzle.png", // PM2.5 Ratchaburi Thailand badge
+  "50d_haze_ratchaburi": "/icons/watercolor/09d_drizzle.png",
   "50d_dust": "/icons/watercolor/50d_haze_pure.png",    // Swirling brown dust storm
   "50d_smoke": "/icons/watercolor/50d_smoke.png",
   "50d_tornado": "/icons/watercolor/50d_tornado.png",   // Swirling tornado funnel
@@ -122,24 +122,15 @@ export function getWeatherIcon(iconCode: string, description?: string): string {
 
 /**
  * Open-Meteo (WMO) to Watercolor Icon Adapter
- * Maps WMO weather codes (0-99) + is_day (0/1) + city/AQI to watercolor icons and accurate labels
+ * Maps meteorological WMO weather codes (0-99) + is_day (0/1) directly to accurate watercolor icons and condition labels.
  */
 export function wmoToIconCode(
   wmoCode: number,
   isDay: number = 1,
-  cityName?: string,
-  aqi?: number
+  _cityName?: string,
+  _aqi?: number
 ): { iconCode: string; desc: string } {
   const isNight = isDay === 0;
-  const isRatchaburi = cityName?.toLowerCase().includes("ratchaburi");
-
-  // Check high haze / dust / Ratchaburi atmosphere
-  if (isRatchaburi && (wmoCode === 45 || wmoCode === 48 || (aqi && aqi > 90))) {
-    return { iconCode: "50d_haze_ratchaburi", desc: "Haze & PM2.5" };
-  }
-  if (aqi && aqi > 150) {
-    return { iconCode: "50d_haze_pure", desc: "Dense Haze & Dust" };
-  }
 
   switch (wmoCode) {
     case 0:
