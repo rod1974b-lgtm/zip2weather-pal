@@ -8,40 +8,40 @@ import { useState } from "react";
 export const watercolorIcons: Record<string, string> = {
   // Day
   "01d": "/icons/watercolor/04d_overcast.png",          // Bright smiling sun with rays
-  "02d": "/icons/watercolor/11d_thunderstorm.png",      // Sun behind small cloud
-  "03d": "/icons/watercolor/50d_mist.png",              // Two fluffy scattered clouds
-  "04d_broken": "/icons/watercolor/09d_shower_rain.png",// Multiple broken clouds
-  "04d": "/icons/watercolor/02d_few_clouds.png",        // Dark gray overcast cloud
-  "09d_drizzle": "/icons/watercolor/50d_smoke.png",     // Light cloud with misty drizzle
-  "09d": "/icons/watercolor/13d_snow.png",              // Heavy shower rain drops
-  "10d_light": "/icons/watercolor/01d_clear_sky.png",   // Cloud with 3 light rain drops
+  "02d": "/icons/watercolor/11d_thunderstorm.png",      // Sun behind small cloud (mostly clear)
+  "03d": "/icons/watercolor/50d_mist.png",              // Two fluffy scattered clouds (partly cloudy)
+  "04d_broken": "/icons/watercolor/09d_shower_rain.png",// Broken clouds
+  "04d": "/icons/watercolor/02d_few_clouds.png",        // Overcast gray cloud
+  "09d_drizzle": "/icons/watercolor/50d_smoke.png",     // Light misty drizzle
+  "09d": "/icons/watercolor/13d_snow.png",              // Shower rain
+  "10d_light": "/icons/watercolor/01d_clear_sky.png",   // Light rain
   "10d": "/icons/watercolor/01d_clear_sky.png",         // Moderate rain
   "10d_heavy": "/icons/watercolor/10d_heavy_rain.png",  // Torrential heavy rain
-  "11d": "/icons/watercolor/10d_light_rain.png",        // Dark storm cloud with lightning bolt
-  "13d": "/icons/watercolor/01n_clear_night.png",       // Blue sparkling snowflake
+  "11d": "/icons/watercolor/10d_light_rain.png",        // Thunderstorm with lightning
+  "13d": "/icons/watercolor/01n_clear_night.png",       // Snowflake
 
   // Night
-  "01n": "/icons/watercolor/03d_scattered.png",         // Crescent moon with stars
+  "01n": "/icons/watercolor/03d_scattered.png",         // Crescent moon with stars (clear night)
   "02n": "/icons/watercolor/10n_rain_night.png",        // Crescent moon behind small cloud
   "03n": "/icons/watercolor/04n_overcast_night.png",    // Crescent moon behind fluffy clouds
   "04n_broken": "/icons/watercolor/09n_shower_night.png",// Broken clouds over moon
-  "04n": "/icons/watercolor/50d_wind.png",              // Heavy night overcast clouds over moon
-  "09n": "/icons/watercolor/03n_scattered_night.png",   // Rain shower + moon
-  "10n": "/icons/watercolor/04n_broken_night.png",      // Cloud with 3 drops + moon
-  "11n": "/icons/watercolor/02n_few_clouds_night.png",  // Lightning storm + rain + moon
-  "13n": "/icons/watercolor/13n_snow_night.png",        // Snowflake with moon and stars
+  "04n": "/icons/watercolor/50d_wind.png",              // Overcast night
+  "09n": "/icons/watercolor/03n_scattered_night.png",   // Night showers
+  "10n": "/icons/watercolor/04n_broken_night.png",      // Night rain
+  "11n": "/icons/watercolor/02n_few_clouds_night.png",  // Night thunderstorm
+  "13n": "/icons/watercolor/13n_snow_night.png",        // Snowflake with moon
 
-  // Atmosphere / Haze
-  "50d": "/icons/watercolor/50d_haze_ratchaburi.png",   // Muted sun with atmospheric dust/haze
-  "50d_mist": "/icons/watercolor/04d_broken.png",       // Three horizontal light wavy mist layers
-  "50d_fog": "/icons/watercolor/50d_dust.png",          // Thick horizontal fog bands
+  // Atmosphere
+  "50d": "/icons/watercolor/50d_haze_ratchaburi.png",
+  "50d_mist": "/icons/watercolor/04d_broken.png",
+  "50d_fog": "/icons/watercolor/50d_dust.png",
   "50d_haze": "/icons/watercolor/50d_haze_ratchaburi.png",
   "50d_haze_pure": "/icons/watercolor/50d_haze_ratchaburi.png",
   "50d_haze_ratchaburi": "/icons/watercolor/09d_drizzle.png",
-  "50d_dust": "/icons/watercolor/50d_haze_pure.png",    // Swirling brown dust storm
+  "50d_dust": "/icons/watercolor/50d_haze_pure.png",
   "50d_smoke": "/icons/watercolor/50d_smoke.png",
-  "50d_tornado": "/icons/watercolor/50d_tornado.png",   // Swirling tornado funnel
-  "50d_wind": "/icons/watercolor/11n_thunderstorm_night.png", // Swirling light blue wind lines
+  "50d_tornado": "/icons/watercolor/50d_tornado.png",
+  "50d_wind": "/icons/watercolor/11n_thunderstorm_night.png",
   "50n": "/icons/watercolor/50d_wind.png",
   "50n_mist": "/icons/watercolor/04d_broken.png",
   "50n_fog": "/icons/watercolor/50d_dust.png",
@@ -84,17 +84,14 @@ export function getWeatherIcon(iconCode: string, description?: string): string {
   const code = (iconCode || "01d").toLowerCase();
   const desc = (description || "").toLowerCase();
 
-  // Heavy rain detection by description
   if (code.startsWith("10") && (desc.includes("heavy") || desc.includes("torrential") || desc.includes("downpour"))) {
     return watercolorIcons["10d_heavy"];
   }
 
-  // Drizzle detection
   if (code.startsWith("09") && desc.includes("drizzle")) {
     return watercolorIcons["09d_drizzle"];
   }
 
-  // Atmosphere by description
   if (code.startsWith("50") || desc.includes("haze") || desc.includes("fog") || desc.includes("mist")) {
     if (desc.includes("mist")) return code.endsWith("n") ? watercolorIcons["50n_mist"] : watercolorIcons["50d_mist"];
     if (desc.includes("fog")) return code.endsWith("n") ? watercolorIcons["50n_fog"] : watercolorIcons["50d_fog"];
@@ -109,7 +106,6 @@ export function getWeatherIcon(iconCode: string, description?: string): string {
 
   if (watercolorIcons[code]) return watercolorIcons[code];
 
-  // Cross-fallback day <-> night
   const dayCode = code.replace("n", "d");
   const nightCode = code.replace("d", "n");
   return (
@@ -122,7 +118,7 @@ export function getWeatherIcon(iconCode: string, description?: string): string {
 
 /**
  * Open-Meteo (WMO) to Watercolor Icon Adapter
- * Maps meteorological WMO weather codes (0-99) + is_day (0/1) directly to accurate watercolor icons and condition labels.
+ * Maps WMO weather codes (0-99) + is_day (0/1) directly to accurate watercolor icons and condition labels.
  */
 export function wmoToIconCode(
   wmoCode: number,
