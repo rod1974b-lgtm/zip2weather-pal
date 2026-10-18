@@ -68,7 +68,6 @@ export function WeatherView({
   const isWarm = tempC >= 22;
 
   const hasDisaster = disasters?.some((alert) => alert.severity === "disaster");
-  const hasWarning = disasters?.some((alert) => alert.severity === "warning");
 
   // Load custom photo for current city
   useEffect(() => {
@@ -290,6 +289,16 @@ export function WeatherView({
         }
     : undefined;
 
+  // STEP 3: Compute hourly forecast starting from CURRENT hour rather than midnight
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentHourIndex = w.hourly.findIndex((h) => {
+    const hDate = new Date(h.time);
+    return hDate.getHours() >= currentHour;
+  });
+  const hourlyStartIndex = currentHourIndex >= 0 ? currentHourIndex : 0;
+  const displayHours = w.hourly.slice(hourlyStartIndex, hourlyStartIndex + 24);
+
   return (
     <>
       {/* Hidden file input for photo upload */}
@@ -346,7 +355,9 @@ export function WeatherView({
         <section className="mt-3">
           <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300 shadow-xs">
             <span className="text-base">🛡️</span>
-            <span className="font-bold uppercase tracking-wider text-[11px]">ALL CLEAR</span>
+            <span className="font-bold uppercase tracking-wider text-[11px]">
+              {t("all_clear", "ALL CLEAR")}
+            </span>
             <span className="text-muted-foreground">·</span>
             <span className="truncate">No active severe weather or disaster alerts for this area.</span>
           </div>
@@ -470,7 +481,7 @@ export function WeatherView({
                     </span>
                   </div>
                   <p className="text-sm text-slate-200 drop-shadow-sm">
-                    {currentInfo.desc} · {t("feels_like")} {Math.round(w.current.feels)}
+                    {currentInfo.desc} · {t("feels_like", "Feels like")} {Math.round(w.current.feels)}
                     {tempSymbol}
                   </p>
                 </div>
@@ -514,7 +525,7 @@ export function WeatherView({
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
           <div className="flex items-center gap-2">
             <span className="text-xl">👔</span>
-            <h3 className="font-semibold">{t("what_to_wear")}</h3>
+            <h3 className="font-semibold">{t("what_to_wear", "What to Wear Today")}</h3>
             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
               Live weather advice
             </span>
@@ -544,26 +555,26 @@ export function WeatherView({
       {/* 4. KEY METRICS GRID */}
       <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <span className="text-xs text-muted-foreground">{t("humidity")}</span>
+          <span className="text-xs text-muted-foreground">{t("humidity", "Humidity")}</span>
           <p className="mt-1 text-2xl font-bold">{Math.round(w.current.humidity)}%</p>
         </div>
 
         <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <span className="text-xs text-muted-foreground">{t("wind")}</span>
+          <span className="text-xs text-muted-foreground">{t("wind", "Wind")}</span>
           <p className="mt-1 text-2xl font-bold">
             {Math.round(w.current.wind)} {windUnit}
           </p>
         </div>
 
         <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <span className="text-xs text-muted-foreground">{t("uv")}</span>
+          <span className="text-xs text-muted-foreground">{t("uv", "UV Index")}</span>
           <p className="mt-1 text-2xl font-bold">
             {w.current.uvIndex} <span className="text-xs font-normal">({uvCategory(w.current.uvIndex)})</span>
           </p>
         </div>
 
         <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <span className="text-xs text-muted-foreground">{t("air_quality")}</span>
+          <span className="text-xs text-muted-foreground">{t("air_quality", "Air Quality")}</span>
           <p className="mt-1 text-2xl font-bold">
             {w.current.aqi !== undefined ? (
               <>
@@ -579,25 +590,29 @@ export function WeatherView({
         </div>
 
         <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <span className="text-xs text-muted-foreground">{t("precipitation")}</span>
+          <span className="text-xs text-muted-foreground">{t("precipitation", "Precipitation")}</span>
           <p className="mt-1 text-2xl font-bold">
             {w.current.precipitation} {precipUnit}
           </p>
         </div>
 
         <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <span className="text-xs text-muted-foreground">{t("sunrise")} / {t("sunset")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("sunrise", "Sunrise")} / {t("sunset", "Sunset")}
+          </span>
           <p className="mt-1 text-base font-semibold">
             {w.sun?.sunrise || "--:--"} · {w.sun?.sunset || "--:--"}
           </p>
         </div>
       </section>
 
-      {/* 5. HOURLY FORECAST WITH WATERCOLOR ICONS */}
+      {/* 5. HOURLY FORECAST (Starts at Current Hour) */}
       <section className="mt-4 rounded-xl border border-border/60 bg-card p-4 shadow-xs">
-        <h3 className="font-semibold text-sm mb-3">{t("today")}</h3>
+        <h3 className="font-semibold text-sm mb-3">
+          {t("hourly", "Hourly Forecast")} · {t("today", "Today")}
+        </h3>
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {w.hourly.slice(0, 24).map((h, i) => {
+          {displayHours.map((h, i) => {
             const hourIsDay = isHourDaytime(h.time);
             const hourInfo = wmoToIconCode(h.code, hourIsDay, w.place.name);
             const hEmoji = describe(h.code).icon;
@@ -629,24 +644,24 @@ export function WeatherView({
         </div>
       </section>
 
-      {/* 6. 7-DAY FORECAST WITH WATERCOLOR ICONS */}
+      {/* 6. 7-DAY FORECAST (Non-truncated, mobile responsive) */}
       <section className="mt-4 rounded-xl border border-border/60 bg-card p-4 shadow-xs">
-        <h3 className="font-semibold text-sm mb-3">{t("seven_day")}</h3>
+        <h3 className="font-semibold text-sm mb-3">{t("seven_day", "7-day forecast")}</h3>
         <div className="divide-y divide-border/40">
           {w.daily.map((dItem, i) => {
             const dayInfo = wmoToIconCode(dItem.code, 1, w.place.name);
             const dayEmoji = describe(dItem.code).icon;
             const dayName =
               i === 0
-                ? "Today"
+                ? t("today", "Today")
                 : new Date(dItem.date + "T12:00:00").toLocaleDateString(undefined, {
                     weekday: "short",
                   });
             return (
-              <div key={dItem.date} className="flex items-center justify-between py-2.5 text-sm">
-                <span className="w-16 font-medium">{dayName}</span>
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center">
+              <div key={dItem.date} className="flex items-center justify-between gap-2 py-2.5 text-sm">
+                <span className="w-14 shrink-0 font-medium">{dayName}</span>
+                <div className="flex flex-1 items-center gap-2 min-w-0">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center">
                     <WeatherIcon
                       wmoCode={dItem.code}
                       isDay={1}
@@ -655,11 +670,11 @@ export function WeatherView({
                       fallbackEmoji={dayEmoji}
                     />
                   </div>
-                  <span className="text-xs text-muted-foreground hidden sm:inline">
+                  <span className="text-xs text-muted-foreground whitespace-normal break-words leading-snug">
                     {dayInfo.desc}
                   </span>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex shrink-0 items-center gap-3">
                   <span className="font-bold">
                     {Math.round(dItem.max)}
                     {tempSymbol}
