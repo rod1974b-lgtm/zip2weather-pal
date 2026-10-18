@@ -1,4 +1,4 @@
-// File: src/lib/i18n.ts - Comprehensive 14 languages (Thai, Spanish, Japanese, English, etc.)
+// src/lib/i18n.ts
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
@@ -24,6 +24,8 @@ const resources = {
       language: "Language",
       feels_like: "Feels like",
       best_time: "Best time to go outside",
+      hourly: "Hourly Forecast",
+      weekly: "Weekly Forecast",
     },
   },
   es: {
@@ -47,6 +49,8 @@ const resources = {
       language: "Idioma",
       feels_like: "Sensación térmica",
       best_time: "Mejor hora para salir",
+      hourly: "Pronóstico por hora",
+      weekly: "Pronóstico semanal",
     },
   },
   ja: {
@@ -70,6 +74,8 @@ const resources = {
       language: "言語",
       feels_like: "体感温度",
       best_time: "外出に最適な時間",
+      hourly: "1時間ごとの予報",
+      weekly: "週間予報",
     },
   },
   th: {
@@ -93,6 +99,8 @@ const resources = {
       language: "ภาษา",
       feels_like: "รู้สึกเหมือน",
       best_time: "เวลาที่ดีที่สุดในการออกไปข้างนอก",
+      hourly: "พยากรณ์รายชั่วโมง",
+      weekly: "พยากรณ์รายสัปดาห์",
     },
   },
   zh: {
@@ -116,6 +124,8 @@ const resources = {
       language: "语言",
       feels_like: "体感温度",
       best_time: "最佳外出时间",
+      hourly: "每小时预报",
+      weekly: "每周预报",
     },
   },
   hi: {
@@ -139,6 +149,8 @@ const resources = {
       language: "भाषा",
       feels_like: "महसूस होता है",
       best_time: "बाहर जाने का सबसे अच्छा समय",
+      hourly: "प्रति घंटे पूर्वानुमान",
+      weekly: "साप्ताहिक पूर्वानुमान",
     },
   },
   fr: {
@@ -162,6 +174,8 @@ const resources = {
       language: "Langue",
       feels_like: "Ressenti",
       best_time: "Meilleur moment pour sortir",
+      hourly: "Prévisions horaires",
+      weekly: "Prévisions hebdomadaires",
     },
   },
   de: {
@@ -185,6 +199,8 @@ const resources = {
       language: "Sprache",
       feels_like: "Gefühlt",
       best_time: "Beste Zeit zum Rausgehen",
+      hourly: "Stündliche Vorhersage",
+      weekly: "Wöchentliche Vorhersage",
     },
   },
   pt: {
@@ -208,6 +224,8 @@ const resources = {
       language: "Idioma",
       feels_like: "Sensação térmica",
       best_time: "Melhor hora para sair",
+      hourly: "Previsão horária",
+      weekly: "Previsão semanal",
     },
   },
   ru: {
@@ -231,6 +249,8 @@ const resources = {
       language: "Язык",
       feels_like: "Ощущается как",
       best_time: "Лучшее время для выхода",
+      hourly: "Почасовой прогноз",
+      weekly: "Еженедельный прогноз",
     },
   },
   ar: {
@@ -254,6 +274,8 @@ const resources = {
       language: "اللغة",
       feels_like: "يبدو مثل",
       best_time: "أفضل وقت للخروج",
+      hourly: "توقعات كل ساعة",
+      weekly: "توقعات أسبوعية",
     },
   },
   ko: {
@@ -277,6 +299,8 @@ const resources = {
       language: "언어",
       feels_like: "체감 온도",
       best_time: "외출하기 좋은 시간",
+      hourly: "시간별 예보",
+      weekly: "주간 예보",
     },
   },
   id: {
@@ -300,6 +324,8 @@ const resources = {
       language: "Bahasa",
       feels_like: "Terasa seperti",
       best_time: "Waktu terbaik untuk keluar",
+      hourly: "Prakiraan per jam",
+      weekly: "Prakiraan mingguan",
     },
   },
   vi: {
@@ -323,6 +349,8 @@ const resources = {
       language: "Ngôn ngữ",
       feels_like: "Cảm giác như",
       best_time: "Thời gian tốt nhất để ra ngoài",
+      hourly: "Dự báo theo giờ",
+      weekly: "Dự báo hàng tuần",
     },
   },
 };
@@ -330,7 +358,7 @@ const resources = {
 const getInitialLang = () => {
   if (typeof window === "undefined") return "en";
   const saved = localStorage.getItem("app_language");
-  if (saved) return saved;
+  if (saved && resources[saved as keyof typeof resources]) return saved;
   const browserLang = (typeof navigator !== "undefined" && navigator.language ? navigator.language : "").toLowerCase();
   if (browserLang.startsWith("es")) return "es";
   if (browserLang.startsWith("ja")) return "ja";
@@ -348,11 +376,22 @@ const getInitialLang = () => {
   return "en";
 };
 
+// Formats missing snake_case keys into Title Case English (e.g. what_to_wear -> "What To Wear")
+const formatMissingKey = (key: string) =>
+  key
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+
 i18n.use(initReactI18next).init({
   resources,
   lng: getInitialLang(),
   fallbackLng: "en",
+  debug: false,
   interpolation: { escapeValue: false },
+  parseMissingKeyHandler: (key: string) => formatMissingKey(key),
+  returnNull: false,
+  returnEmptyString: false,
 });
 
 export default i18n;
