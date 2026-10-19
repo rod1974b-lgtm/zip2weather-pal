@@ -6,6 +6,7 @@ import {
   getCityWeatherBackground,
   getAllAvailableArtworks,
   saveCustomArtChoice,
+  getInstantBackground,
 } from "@/lib/aiWatercolorGenerator";
 import { WeatherIcon, wmoToIconCode } from "@/lib/weatherIcons";
 import { AiCustomSceneDialog } from "@/components/AiCustomSceneDialog";
@@ -52,7 +53,8 @@ export function WeatherView({
   const precipUnit = w.unit === "imperial" ? "in" : "mm";
   const tempSymbol = w.unit === "imperial" ? "°F" : "°C";
 
-  const [heroBg, setHeroBg] = useState<string>("");
+  // Instant weather gradient fallback ensures hero is never pitch black
+  const [heroBg, setHeroBg] = useState<string>(() => getInstantBackground(w.current.code));
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAiGenerated, setIsAiGenerated] = useState(false);
   const [wearStyle, setWearStyle] = useState<"casual" | "business" | "sport">("casual");
@@ -75,7 +77,7 @@ export function WeatherView({
   useEffect(() => {
     if (!w?.place?.name) return;
     try {
-      const saved = localStorage.getItem(`weather:custom-bg:${w.place.name}`);
+      const saved = localStorage.getItem(`weather:custom-bg:${w.place.name.toLowerCase().trim()}`);
       setCustomPhoto(saved || null);
     } catch {
       setCustomPhoto(null);
@@ -104,15 +106,29 @@ export function WeatherView({
     let isMounted = true;
     setIsGenerating(true);
 
-    getCityWeatherBackground(w.place.name, w.current.code, w.current.temp, w.unit, w.place.country)
+    getCityWeatherBackground(
+      w.place.name,
+      currentInfo.desc,
+      w.current.code,
+      w.current.temp,
+      (loadedUrl) => {
+        if (!isMounted) return;
+        setHeroBg(loadedUrl);
+        setIsAiGenerated(true);
+      },
+      w.place.country,
+      w.place.lat,
+      w.place.lon
+    )
       .then((art) => {
         if (!isMounted) return;
-        setHeroBg(art.imageUrl);
-        setIsAiGenerated(art.isAiGenerated);
+        setHeroBg(art.initialBg);
+        setIsAiGenerated(art.isAi);
         setIsGenerating(false);
       })
       .catch(() => {
         if (!isMounted) return;
+        setHeroBg(getInstantBackground(w.current.code));
         setIsGenerating(false);
       });
 
@@ -127,22 +143,23 @@ export function WeatherView({
     setIsGenerating(true);
 
     try {
-      const available = await getAllAvailableArtworks(
+      const available = getAllAvailableArtworks(
         w.place.name,
         w.current.code,
-        w.current.temp,
-        w.unit,
-        w.place.country
+        currentInfo.desc,
+        w.place.country,
+        w.place.lat,
+        w.place.lon
       );
 
       if (available.length > 0) {
-        const currentIndex = available.findIndex((item) => item.imageUrl === heroBg);
+        const currentIndex = available.findIndex((url) => url === heroBg);
         const nextIndex = (currentIndex + 1) % available.length;
         const nextArt = available[nextIndex];
 
-        setHeroBg(nextArt.imageUrl);
-        setIsAiGenerated(nextArt.isAiGenerated);
-        saveCustomArtChoice(w.place.name, nextArt.imageUrl);
+        setHeroBg(nextArt);
+        setIsAiGenerated(true);
+        saveCustomArtChoice(w.place.name, nextArt);
       }
     } catch (err) {
       console.warn("Could not cycle artwork:", err);
@@ -157,15 +174,28 @@ export function WeatherView({
     setShowArtMenu(false);
     if (!w?.place?.name) return;
     try {
-      localStorage.removeItem(`weather:custom-art:${w.place.name}`);
-      localStorage.removeItem(`weather:custom-bg:${w.place.name}`);
+      localStorage.removeItem(`weather:custom-art:${w.place.name.toLowerCase().trim()}`);
+      localStorage.removeItem(`weather:custom-bg:${w.place.name.toLowerCase().trim()}`);
     } catch {}
     setCustomPhoto(null);
     setIsGenerating(true);
-    getCityWeatherBackground(w.place.name, w.current.code, w.current.temp, w.unit, w.place.country)
+
+    getCityWeatherBackground(
+      w.place.name,
+      currentInfo.desc,
+      w.current.code,
+      w.current.temp,
+      (loadedUrl) => {
+        setHeroBg(loadedUrl);
+        setIsAiGenerated(true);
+      },
+      w.place.country,
+      w.place.lat,
+      w.place.lon
+    )
       .then((art) => {
-        setHeroBg(art.imageUrl);
-        setIsAiGenerated(art.isAiGenerated);
+        setHeroBg(art.initialBg);
+        setIsAiGenerated(art.isAi);
       })
       .finally(() => setIsGenerating(false));
   };
@@ -173,7 +203,7 @@ export function WeatherView({
   // Handle image generation from AI modal
   const handleCustomAiImageGenerated = (imageUrl: string, city: string) => {
     try {
-      localStorage.setItem(`weather:custom-bg:${city}`, imageUrl);
+      localStorage.setItem(`weather:custom-bg:${city.toLowerCase().trim()}`, imageUrl);
       setCustomPhoto(imageUrl);
       setIsAiGenerated(true);
     } catch (e) {
@@ -211,7 +241,7 @@ export function WeatherView({
           ctx.drawImage(img, 0, 0, width, height);
           const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
           try {
-            localStorage.setItem(`weather:custom-bg:${w.place.name}`, dataUrl);
+            localStorage.setItem(`weather:custom-bg:${w.place.name.toLowerCase().trim()}`, dataUrl);
             setCustomPhoto(dataUrl);
           } catch (err) {
             console.warn("Storage quota exceeded for custom photo:", err);
@@ -229,7 +259,7 @@ export function WeatherView({
     setShowArtMenu(false);
     if (!w?.place?.name) return;
     try {
-      localStorage.removeItem(`weather:custom-bg:${w.place.name}`);
+      localStorage.removeItem(`weather:custom-bg:${w.place.name.toLowerCase().trim()}`);
     } catch {}
     setCustomPhoto(null);
   };
@@ -284,25 +314,16 @@ export function WeatherView({
     }
   }
 
-  // Hero background computation
-  const isGradient = heroBg.startsWith("linear-gradient");
-  const bgStyle = customPhoto
-    ? {
-        backgroundImage: `url("${customPhoto}")`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }
-    : heroBg
-    ? isGradient
-      ? { backgroundImage: heroBg }
-      : {
-          backgroundImage: `url("${heroBg}")`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }
-    : undefined;
+  // Hero background styling (always populated with photo or atmospheric gradient)
+  const activeBg = customPhoto || heroBg || getInstantBackground(w.current.code);
+  const isGradient = activeBg.startsWith("linear-gradient");
+  const bgStyle = {
+    backgroundImage: isGradient ? activeBg : `url("${activeBg}")`,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+  };
 
-  // Compute hourly forecast starting from CURRENT hour rather than midnight
+  // Hourly forecast starting from CURRENT hour rather than midnight
   const now = new Date();
   const currentHour = now.getHours();
   const currentHourIndex = w.hourly.findIndex((h) => {
