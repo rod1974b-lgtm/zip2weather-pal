@@ -254,7 +254,7 @@ export function WeatherView({
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/25 z-0" />
 
         <div className="relative z-10 p-5 flex flex-col justify-between min-h-[190px]">
-          {/* Top row: City Name, Favorite, AI Gallery shortcut */}
+          {/* Top row: City Name & Favorite */}
           <div className="flex items-start justify-between gap-2">
             <div>
               <div className="flex items-center gap-2">
@@ -267,23 +267,10 @@ export function WeatherView({
                   onClick={onToggleFav}
                   title={isFav ? "Remove favorite" : "Add favorite"}
                   aria-label={isFav ? "Remove favorite" : "Add favorite"}
-                  className="text-lg transition-transform hover:scale-110 active:scale-95"
+                  className="text-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
                 >
                   {isFav ? "⭐" : "☆"}
                 </button>
-
-                {/* AI Gallery Shortcut Button */}
-                {onOpenGallery && (
-                  <button
-                    type="button"
-                    onClick={onOpenGallery}
-                    className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/40 px-2.5 py-1 text-[11px] font-medium text-white/90 backdrop-blur-md hover:bg-white/20 transition-all active:scale-95 shadow-xs"
-                    title="Open AI Gallery"
-                  >
-                    <span>✨</span>
-                    <span>AI Art</span>
-                  </button>
-                )}
               </div>
 
               <p className="text-xs text-white/80 drop-shadow-sm flex items-center gap-1.5 mt-0.5">
@@ -297,7 +284,7 @@ export function WeatherView({
             <button
               onClick={onRefresh}
               disabled={refreshing}
-              className="flex items-center gap-1 rounded-full border border-white/20 bg-black/30 backdrop-blur-md px-2.5 py-1 text-xs text-white/90 hover:bg-white/10 transition-colors"
+              className="flex items-center gap-1 rounded-full border border-white/20 bg-black/30 backdrop-blur-md px-2.5 py-1 text-xs text-white/90 hover:bg-white/10 transition-colors cursor-pointer"
               title="Refresh forecast"
             >
               <span className={`text-xs ${refreshing ? "animate-spin" : ""}`}>↻</span>
@@ -385,7 +372,7 @@ export function WeatherView({
               <button
                 key={mode}
                 onClick={() => setWearStyle(mode)}
-                className={`rounded-md px-2.5 py-1 capitalize font-medium transition-colors ${
+                className={`rounded-md px-2.5 py-1 capitalize font-medium transition-colors cursor-pointer ${
                   wearStyle === mode
                     ? "bg-card text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
