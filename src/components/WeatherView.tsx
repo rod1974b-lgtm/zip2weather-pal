@@ -46,10 +46,8 @@ export function WeatherView({
   onOpenGallery,
 }: WeatherViewProps) {
   const { t } = useTranslation();
-  const d = describe(w.current.code);
   const currentInfo = wmoToIconCode(w.current.code, w.current.is_day ?? 1, w.place.name, w.current.aqi);
   const windUnit = w.unit === "imperial" ? "mph" : "km/h";
-  const precipUnit = w.unit === "imperial" ? "in" : "mm";
   const tempSymbol = w.unit === "imperial" ? "°F" : "°C";
 
   // Instant weather gradient fallback ensures hero is never pitch black
@@ -67,6 +65,11 @@ export function WeatherView({
   const isWarm = tempC >= 22;
 
   const hasDisaster = disasters?.some((alert) => alert.severity === "disaster");
+
+  // Today's high and low from daily forecast
+  const todayForecast = w.daily?.[0];
+  const highTemp = todayForecast ? Math.round(todayForecast.max) : Math.round(w.current.temp);
+  const lowTemp = todayForecast ? Math.round(todayForecast.min) : Math.round(w.current.temp);
 
   // Load custom photo for current city
   useEffect(() => {
@@ -286,7 +289,7 @@ export function WeatherView({
               <p className="text-xs text-white/80 drop-shadow-sm flex items-center gap-1.5 mt-0.5">
                 <span>{currentInfo.desc}</span>
                 <span>•</span>
-                <span>Feels like {w.current.feelsLike}°{tempSymbol}</span>
+                <span>Feels like {Math.round(w.current.feels)}°{tempSymbol}</span>
               </p>
             </div>
 
@@ -306,18 +309,18 @@ export function WeatherView({
           <div className="mt-6 flex items-end justify-between">
             <div className="flex items-baseline gap-2">
               <span className="text-6xl font-black tracking-tighter text-white drop-shadow-lg">
-                {w.current.temp}°
+                {Math.round(w.current.temp)}°
               </span>
               <div className="text-xs text-white/80 font-medium">
-                <div>H: {w.today.maxTemp}°</div>
-                <div>L: {w.today.minTemp}°</div>
+                <div>H: {highTemp}°</div>
+                <div>L: {lowTemp}°</div>
               </div>
             </div>
 
             <div className="flex flex-col items-end">
               <div className="relative">
                 <WeatherIcon
-                  code={w.current.code}
+                  wmoCode={w.current.code}
                   isDay={w.current.is_day ?? 1}
                   className="h-16 w-16 drop-shadow-md"
                 />
@@ -372,7 +375,7 @@ export function WeatherView({
             <div>
               <h3 className="font-semibold text-sm leading-none">{t("what_to_wear", "What to Wear")}</h3>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Tailored for {currentInfo.desc.toLowerCase()} & {w.current.temp}°{tempSymbol}
+                Tailored for {currentInfo.desc.toLowerCase()} & {Math.round(w.current.temp)}°{tempSymbol}
               </p>
             </div>
           </div>
@@ -407,9 +410,9 @@ export function WeatherView({
             <span>💨</span>
           </div>
           <div className="mt-1 text-lg font-bold">
-            {w.current.windSpeed} <span className="text-xs font-normal text-muted-foreground">{windUnit}</span>
+            {Math.round(w.current.wind)} <span className="text-xs font-normal text-muted-foreground">{windUnit}</span>
           </div>
-          <div className="text-[10px] text-muted-foreground">{w.current.windDirection}° direction</div>
+          <div className="text-[10px] text-muted-foreground">Surface breeze</div>
         </div>
 
         <div className="rounded-xl border border-border bg-card p-3 shadow-xs">
@@ -458,13 +461,13 @@ export function WeatherView({
                   {i === 0 ? "Now" : h.time.slice(11, 16)}
                 </span>
                 <WeatherIcon
-                  code={h.code}
+                  wmoCode={h.code}
                   isDay={isDayForHour}
                   className="my-1.5 h-7 w-7"
                 />
-                <span className="text-sm font-bold">{h.temp}°</span>
+                <span className="text-sm font-bold">{Math.round(h.temp)}°</span>
                 <span className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2 max-w-[65px] leading-tight">
-                  {describe(h.code)}
+                  {describe(h.code).label}
                 </span>
                 {h.precipProb > 0 && (
                   <span className="mt-1 text-[9px] font-medium text-blue-500">
@@ -493,18 +496,18 @@ export function WeatherView({
                 <span className="w-14 font-medium">{dayName}</span>
 
                 <div className="flex items-center gap-2 flex-1 px-2">
-                  <WeatherIcon code={day.code} isDay={1} className="h-5 w-5 shrink-0" />
-                  <span className="text-muted-foreground truncate">{describe(day.code)}</span>
+                  <WeatherIcon wmoCode={day.code} isDay={1} className="h-5 w-5 shrink-0" />
+                  <span className="text-muted-foreground truncate">{describe(day.code).label}</span>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  {day.precipProb > 0 && (
+                  {day.precipProbMax > 0 && (
                     <span className="text-[10px] font-medium text-blue-500 w-8 text-right">
-                      {day.precipProb}%
+                      {day.precipProbMax}%
                     </span>
                   )}
-                  <span className="font-bold w-7 text-right">{day.maxTemp}°</span>
-                  <span className="text-muted-foreground w-7 text-right">{day.minTemp}°</span>
+                  <span className="font-bold w-7 text-right">{Math.round(day.max)}°</span>
+                  <span className="text-muted-foreground w-7 text-right">{Math.round(day.min)}°</span>
                 </div>
               </div>
             );
