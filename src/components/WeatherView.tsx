@@ -34,6 +34,7 @@ interface WeatherViewProps {
   onToggleFav: () => void;
   onRefresh: () => void;
   onOpenGallery?: () => void;
+  customBg?: string | null;
 }
 
 export function WeatherView({
@@ -44,6 +45,7 @@ export function WeatherView({
   onToggleFav,
   onRefresh,
   onOpenGallery,
+  customBg,
 }: WeatherViewProps) {
   const { t } = useTranslation();
   const currentInfo = wmoToIconCode(w.current.code, w.current.is_day ?? 1, w.place.name, w.current.aqi);
@@ -57,7 +59,7 @@ export function WeatherView({
   const [wearStyle, setWearStyle] = useState<"casual" | "business" | "sport">("casual");
 
   // Custom photo & AI background state
-  const [customPhoto, setCustomPhoto] = useState<string | null>(null);
+  const [customPhoto, setCustomPhoto] = useState<string | null>(() => customBg || null);
 
   const tempC = w.unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
   const isRainy = w.current.code >= 51 && w.current.code <= 82;
@@ -70,6 +72,13 @@ export function WeatherView({
   const todayForecast = w.daily?.[0];
   const highTemp = todayForecast ? Math.round(todayForecast.max) : Math.round(w.current.temp);
   const lowTemp = todayForecast ? Math.round(todayForecast.min) : Math.round(w.current.temp);
+
+  // Sync external customBg prop change instantly
+  useEffect(() => {
+    if (customBg !== undefined) {
+      setCustomPhoto(customBg);
+    }
+  }, [customBg]);
 
   // Load custom photo for current city
   useEffect(() => {
@@ -173,7 +182,7 @@ export function WeatherView({
   }
 
   // Hero background styling (always populated with photo or atmospheric gradient)
-  const activeBg = customPhoto || heroBg || getInstantBackground(w.current.code);
+  const activeBg = (customBg !== undefined ? customBg : customPhoto) || heroBg || getInstantBackground(w.current.code);
   const isGradient = activeBg.startsWith("linear-gradient");
   const bgStyle = {
     backgroundImage: isGradient ? activeBg : `url("${activeBg}")`,
@@ -320,23 +329,14 @@ export function WeatherView({
                     <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping" />
                     Matching art…
                   </span>
-                ) : customPhoto ? (
-                  <button
-                    type="button"
-                    onClick={onOpenGallery}
-                    className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2 py-0.5 border border-white/15 hover:bg-white/15 transition-colors cursor-pointer"
-                  >
-                    <span>📷</span>
-                    <span>Custom background</span>
-                  </button>
-                ) : isAiGenerated ? (
+                ) : activeBg && !activeBg.startsWith("linear-gradient") ? (
                   <button
                     type="button"
                     onClick={onOpenGallery}
                     className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2 py-0.5 border border-white/15 hover:bg-white/15 transition-colors cursor-pointer"
                   >
                     <span>✨</span>
-                    <span>AI vibrant watercolor</span>
+                    <span>AI custom scene</span>
                   </button>
                 ) : (
                   <button
