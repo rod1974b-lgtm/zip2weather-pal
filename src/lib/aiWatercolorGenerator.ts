@@ -427,15 +427,15 @@ export function compressImageFile(file: File, maxDim = 1200, quality = 0.82): Pr
 // ============================================================================
 export function getAllAvailableArtworks(
   cityName: string,
-  weatherCode: string | number,
-  weatherDesc: string,
+  weatherCode: string | number = 0,
+  weatherDesc: string = "clear",
   country?: string,
-  lat?: number,
-  lon?: number
+  _lat?: number,
+  _lon?: number
 ): string[] {
-  const cityKey = cityName.toLowerCase().trim();
-  const descKey = weatherDesc.toLowerCase();
-  const code = Number(weatherCode);
+  const cityKey = (cityName || "").toLowerCase().trim();
+  const descKey = (typeof weatherDesc === "string" ? weatherDesc : "").toLowerCase();
+  const code = Number(weatherCode) || 0;
 
   const list: string[] = [];
 
