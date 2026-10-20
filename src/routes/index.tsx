@@ -378,9 +378,6 @@ function Index() {
   const [results, setResults] = useState<Place[]>([]);
   const [searching, setSearching] = useState(false);
   const [showLocDialog, setShowLocDialog] = useState(false);
-  const [showInstallDialog, setShowInstallDialog] = useState(false);
-  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
-  const [isStandalone, setIsStandalone] = useState(false);
   const [skyChoice, setSkyChoice] = useState("auto");
   const [fontSizeChoice, setFontSizeChoice] = useState("normal");
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -592,7 +589,7 @@ function Index() {
             <button
               type="button"
               onClick={() => setShowAiGallery(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 hover:bg-primary/20 px-3 py-1 text-xs font-semibold text-primary transition-all active:scale-95 shadow-xs"
+              className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 hover:bg-primary/20 px-3 py-1 text-xs font-semibold text-primary transition-all active:scale-95 shadow-xs cursor-pointer"
               title="Open AI Background Gallery"
             >
               <span className="text-sm">✨</span>
@@ -760,31 +757,31 @@ function Index() {
         )}
 
         {/* DEDICATED AI GALLERY MODAL */}
-        {weather && (
-          <AiGalleryModal
-            isOpen={showAiGallery}
-            onClose={() => setShowAiGallery(false)}
-            city={weather.place.name}
-            country={weather.place.country}
-            weatherCode={weather.current.code}
-            weatherDesc={describe(weather.current.code)}
-            activeBackground={activeCustomBg}
-            onSelectBackground={(newBg) => {
-              setActiveCustomBg(newBg);
-              if (!newBg) {
-                try {
-                  localStorage.removeItem(`weather:custom-bg:${weather.place.name.toLowerCase().trim()}`);
-                } catch {}
-              } else {
-                try {
-                  localStorage.setItem(`weather:custom-bg:${weather.place.name.toLowerCase().trim()}`, newBg);
-                } catch {}
-              }
-              // Force reload weather state so WeatherView picks up the change
+        <AiGalleryModal
+          isOpen={showAiGallery}
+          onClose={() => setShowAiGallery(false)}
+          city={weather?.place.name || "Local Scenery"}
+          country={weather?.place.country}
+          weatherCode={weather?.current.code ?? 0}
+          weatherDesc={weather ? describe(weather.current.code).label : "Clear sky"}
+          activeBackground={activeCustomBg}
+          onSelectBackground={(newBg) => {
+            setActiveCustomBg(newBg);
+            const cityName = weather?.place.name || "default";
+            if (!newBg) {
+              try {
+                localStorage.removeItem(`weather:custom-bg:${cityName.toLowerCase().trim()}`);
+              } catch {}
+            } else {
+              try {
+                localStorage.setItem(`weather:custom-bg:${cityName.toLowerCase().trim()}`, newBg);
+              } catch {}
+            }
+            if (weather) {
               load(weather.place, unit, true);
-            }}
-          />
-        )}
+            }
+          }}
+        />
       </main>
     </div>
   );
