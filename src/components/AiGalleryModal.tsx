@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from "react";
 import {
   getAllAvailableArtworks,
-  getInstantBackground,
   WEATHER_WATERCOLORS,
 } from "@/lib/aiWatercolorGenerator";
 
@@ -11,7 +10,7 @@ interface AiGalleryModalProps {
   onClose: () => void;
   city: string;
   country?: string;
-  weatherCode: number;
+  weatherCode?: number;
   weatherDesc?: string;
   activeBackground: string | null;
   onSelectBackground: (url: string | null) => void;
@@ -31,8 +30,8 @@ export function AiGalleryModal({
   onClose,
   city,
   country,
-  weatherCode,
-  weatherDesc,
+  weatherCode = 0,
+  weatherDesc = "Clear sky",
   activeBackground,
   onSelectBackground,
 }: AiGalleryModalProps) {
@@ -55,14 +54,18 @@ export function AiGalleryModal({
 
   if (!isOpen) return null;
 
-  // Retrieve curated artworks for current location
-  const cityArtworks = getAllAvailableArtworks(city, country);
+  const targetCity = city?.trim() || "Local Scenery";
 
-  // Atmospheric weather backgrounds
-  const weatherArtworks = [
-    ...(WEATHER_WATERCOLORS.day || []),
-    ...(WEATHER_WATERCOLORS.night || []),
-  ];
+  // Retrieve curated artworks with all required parameters
+  const cityArtworks = getAllAvailableArtworks(
+    targetCity,
+    weatherCode,
+    typeof weatherDesc === "string" ? weatherDesc : "Clear sky",
+    country
+  );
+
+  // Atmospheric weather backgrounds flattened across all conditions
+  const weatherArtworks = Object.values(WEATHER_WATERCOLORS).flat();
 
   const handleSelect = (url: string | null) => {
     onSelectBackground(url);
@@ -71,7 +74,7 @@ export function AiGalleryModal({
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!city.trim() || !prompt.trim() || generating) return;
+    if (!targetCity || !prompt.trim() || generating) return;
 
     setGenerating(true);
     setErrorMsg(null);
@@ -81,7 +84,7 @@ export function AiGalleryModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          city: city.trim(),
+          city: targetCity,
           userPrompt: prompt.trim(),
           weatherDesc,
         }),
@@ -96,7 +99,7 @@ export function AiGalleryModal({
 
       // Save to city custom background
       try {
-        localStorage.setItem(`weather:custom-bg:${city.toLowerCase().trim()}`, newImageUrl);
+        localStorage.setItem(`weather:custom-bg:${targetCity.toLowerCase().trim()}`, newImageUrl);
       } catch (err) {
         console.warn("Storage quota exceeded:", err);
       }
@@ -119,23 +122,23 @@ export function AiGalleryModal({
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !city) return;
+    if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement("canvas");
-        const MAX_DIM = 1200;
+        const maxDim = 1200;
         let width = img.width;
         let height = img.height;
 
-        if (width > height && width > MAX_DIM) {
-          height = Math.round((height * MAX_DIM) / width);
-          width = MAX_DIM;
-        } else if (height > MAX_DIM) {
-          width = Math.round((width * MAX_DIM) / height);
-          height = MAX_DIM;
+        if (width > height && width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
         }
 
         canvas.width = width;
@@ -145,7 +148,7 @@ export function AiGalleryModal({
           ctx.drawImage(img, 0, 0, width, height);
           const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
           try {
-            localStorage.setItem(`weather:custom-bg:${city.toLowerCase().trim()}`, dataUrl);
+            localStorage.setItem(`weather:custom-bg:${targetCity.toLowerCase().trim()}`, dataUrl);
             const nextHistory = [dataUrl, ...savedGallery.filter((u) => u !== dataUrl)].slice(0, 24);
             localStorage.setItem("weather:ai-gallery-history", JSON.stringify(nextHistory));
             setSavedGallery(nextHistory);
@@ -183,7 +186,7 @@ export function AiGalleryModal({
             <div>
               <h2 className="text-lg font-bold tracking-tight">AI Background Gallery</h2>
               <p className="text-xs text-slate-400">
-                Custom scenery for <span className="text-white font-medium">{city}</span>
+                Custom scenery for <span className="text-white font-medium">{targetCity}</span>
               </p>
             </div>
           </div>
@@ -241,7 +244,7 @@ export function AiGalleryModal({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-200">
-                    Artworks for {city}
+                    Artworks for {targetCity}
                   </h3>
                   <p className="text-xs text-slate-400">
                     Tap any image to set as your live hero card background
@@ -265,38 +268,42 @@ export function AiGalleryModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {cityArtworks.map((url, idx) => {
-                  const isActive = activeBackground === url;
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => handleSelect(url)}
-                      className={`group relative aspect-16/10 cursor-pointer overflow-hidden rounded-xl border transition-all ${
-                        isActive
-                          ? "border-primary ring-2 ring-primary shadow-lg scale-[1.02]"
-                          : "border-white/15 hover:border-white/40 hover:scale-[1.01]"
-                      }`}
-                    >
-                      <img
-                        src={url}
-                        alt={`${city} landmark ${idx + 1}`}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80 group-hover:opacity-100 transition-opacity" />
-                      {isActive && (
-                        <div className="absolute top-2 right-2 rounded-full bg-primary p-1 text-[10px] text-white shadow-sm">
-                          ✓ Active
+              {cityArtworks.length === 0 ? (
+                <p className="text-xs text-slate-400 py-4">No curated local landmarks yet. Check out the atmospheric presets below or generate a custom scene!</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {cityArtworks.map((url, idx) => {
+                    const isActive = activeBackground === url;
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => handleSelect(url)}
+                        className={`group relative aspect-16/10 cursor-pointer overflow-hidden rounded-xl border transition-all ${
+                          isActive
+                            ? "border-primary ring-2 ring-primary shadow-lg scale-[1.02]"
+                            : "border-white/15 hover:border-white/40 hover:scale-[1.01]"
+                        }`}
+                      >
+                        <img
+                          src={url}
+                          alt={`${targetCity} landmark ${idx + 1}`}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80 group-hover:opacity-100 transition-opacity" />
+                        {isActive && (
+                          <div className="absolute top-2 right-2 rounded-full bg-primary p-1 text-[10px] text-white shadow-sm">
+                            ✓ Active
+                          </div>
+                        )}
+                        <div className="absolute bottom-2 left-2 right-2 text-[11px] font-medium text-white truncate">
+                          {targetCity} Art #{idx + 1}
                         </div>
-                      )}
-                      <div className="absolute bottom-2 left-2 right-2 text-[11px] font-medium text-white truncate">
-                        {city} Art #{idx + 1}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Atmospheric Weather Presets */}
               <div className="pt-4 border-t border-white/10">
@@ -423,7 +430,7 @@ export function AiGalleryModal({
                   </label>
                   <input
                     type="text"
-                    value={city}
+                    value={targetCity}
                     disabled
                     className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/80 cursor-not-allowed"
                   />
