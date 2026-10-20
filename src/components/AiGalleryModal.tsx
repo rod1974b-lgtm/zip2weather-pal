@@ -25,6 +25,62 @@ const PRESET_IDEAS = [
   "Dramatic lightning over mountain peaks",
 ];
 
+// Compresses high-res 3MB AI images down to ~90KB so they fit comfortably in browser storage
+function compressImageForStorage(dataUrl: string, maxDim = 1080, quality = 0.82): Promise<string> {
+  return new Promise((resolve) => {
+    if (!dataUrl.startsWith("data:")) return resolve(dataUrl);
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height && width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(dataUrl);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      } catch {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+function safeSetStorage(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    try {
+      const historyRaw = localStorage.getItem("weather:ai-gallery-history");
+      if (historyRaw) {
+        const history: string[] = JSON.parse(historyRaw);
+        if (history.length > 2) {
+          localStorage.setItem("weather:ai-gallery-history", JSON.stringify(history.slice(0, 3)));
+          localStorage.setItem(key, value);
+          return true;
+        }
+      }
+    } catch {}
+    return false;
+  }
+}
+
 export function AiGalleryModal({
   isOpen,
   onClose,
@@ -95,23 +151,21 @@ export function AiGalleryModal({
         throw new Error(data.error || "Failed to generate image");
       }
 
-      const newImageUrl = data.imageUrl;
+      const rawUrl = data.imageUrl;
+      // Compress the 3MB raw image into lightweight ~90KB JPEG to stay well within browser quota
+      const optimizedUrl = await compressImageForStorage(rawUrl, 1080, 0.82);
 
       // Save to city custom background
-      try {
-        localStorage.setItem(`weather:custom-bg:${targetCity.toLowerCase().trim()}`, newImageUrl);
-      } catch (err) {
-        console.warn("Storage quota exceeded:", err);
-      }
+      safeSetStorage(`weather:custom-bg:${targetCity.toLowerCase().trim()}`, optimizedUrl);
 
       // Add to persistent AI Gallery history
       try {
-        const nextHistory = [newImageUrl, ...savedGallery.filter((u) => u !== newImageUrl)].slice(0, 24);
-        localStorage.setItem("weather:ai-gallery-history", JSON.stringify(nextHistory));
+        const nextHistory = [optimizedUrl, ...savedGallery.filter((u) => u !== optimizedUrl)].slice(0, 16);
+        safeSetStorage("weather:ai-gallery-history", JSON.stringify(nextHistory));
         setSavedGallery(nextHistory);
       } catch {}
 
-      onSelectBackground(newImageUrl);
+      onSelectBackground(optimizedUrl);
       onClose();
     } catch (err: any) {
       setErrorMsg(err?.message || "Failed to connect to AI Gateway.");
@@ -147,14 +201,10 @@ export function AiGalleryModal({
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
           const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
-          try {
-            localStorage.setItem(`weather:custom-bg:${targetCity.toLowerCase().trim()}`, dataUrl);
-            const nextHistory = [dataUrl, ...savedGallery.filter((u) => u !== dataUrl)].slice(0, 24);
-            localStorage.setItem("weather:ai-gallery-history", JSON.stringify(nextHistory));
-            setSavedGallery(nextHistory);
-          } catch (err) {
-            console.warn("Storage quota exceeded:", err);
-          }
+          safeSetStorage(`weather:custom-bg:${targetCity.toLowerCase().trim()}`, dataUrl);
+          const nextHistory = [dataUrl, ...savedGallery.filter((u) => u !== dataUrl)].slice(0, 16);
+          safeSetStorage("weather:ai-gallery-history", JSON.stringify(nextHistory));
+          setSavedGallery(nextHistory);
           onSelectBackground(dataUrl);
           onClose();
         }
@@ -193,7 +243,7 @@ export function AiGalleryModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
             aria-label="Close"
           >
             ✕
@@ -205,7 +255,7 @@ export function AiGalleryModal({
           <button
             type="button"
             onClick={() => setTab("gallery")}
-            className={`rounded-lg px-3 py-1.5 font-medium transition-all ${
+            className={`rounded-lg px-3 py-1.5 font-medium transition-all cursor-pointer ${
               tab === "gallery"
                 ? "bg-primary text-primary-foreground shadow-xs"
                 : "text-slate-300 hover:bg-white/10 hover:text-white"
@@ -216,7 +266,7 @@ export function AiGalleryModal({
           <button
             type="button"
             onClick={() => setTab("saved")}
-            className={`rounded-lg px-3 py-1.5 font-medium transition-all ${
+            className={`rounded-lg px-3 py-1.5 font-medium transition-all cursor-pointer ${
               tab === "saved"
                 ? "bg-primary text-primary-foreground shadow-xs"
                 : "text-slate-300 hover:bg-white/10 hover:text-white"
@@ -227,7 +277,7 @@ export function AiGalleryModal({
           <button
             type="button"
             onClick={() => setTab("generate")}
-            className={`rounded-lg px-3 py-1.5 font-medium transition-all ${
+            className={`rounded-lg px-3 py-1.5 font-medium transition-all cursor-pointer ${
               tab === "generate"
                 ? "bg-primary text-primary-foreground shadow-xs"
                 : "text-slate-300 hover:bg-white/10 hover:text-white"
@@ -254,14 +304,14 @@ export function AiGalleryModal({
                   <button
                     type="button"
                     onClick={() => handleSelect(null)}
-                    className="rounded-lg border border-white/20 bg-white/5 px-2.5 py-1 text-xs text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                    className="rounded-lg border border-white/20 bg-white/5 px-2.5 py-1 text-xs text-slate-300 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
                   >
                     🔄 Auto Weather
                   </button>
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="rounded-lg border border-white/20 bg-white/5 px-2.5 py-1 text-xs text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                    className="rounded-lg border border-white/20 bg-white/5 px-2.5 py-1 text-xs text-slate-300 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
                   >
                     📷 Upload Photo
                   </button>
@@ -362,7 +412,7 @@ export function AiGalleryModal({
                         setSavedGallery([]);
                       } catch {}
                     }}
-                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                    className="text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer"
                   >
                     Clear History
                   </button>
@@ -379,7 +429,7 @@ export function AiGalleryModal({
                   <button
                     type="button"
                     onClick={() => setTab("generate")}
-                    className="mt-4 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-all"
+                    className="mt-4 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
                   >
                     ✨ Generate First Scene
                   </button>
@@ -461,7 +511,7 @@ export function AiGalleryModal({
                         key={i}
                         type="button"
                         onClick={() => setPrompt(idea)}
-                        className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-slate-300 hover:border-primary/50 hover:bg-primary/20 hover:text-white transition-all text-left"
+                        className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-slate-300 hover:border-primary/50 hover:bg-primary/20 hover:text-white transition-all text-left cursor-pointer"
                       >
                         {idea}
                       </button>
@@ -478,7 +528,7 @@ export function AiGalleryModal({
                 <button
                   type="submit"
                   disabled={generating || !prompt.trim()}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 font-semibold text-sm text-primary-foreground shadow-md transition-all hover:bg-primary/90 disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 font-semibold text-sm text-primary-foreground shadow-md transition-all hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
                 >
                   {generating ? (
                     <>
