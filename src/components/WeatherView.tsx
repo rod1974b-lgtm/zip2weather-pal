@@ -1,15 +1,12 @@
 // src/components/WeatherView.tsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { describe, uvCategory, aqiCategory, type Weather } from "@/lib/weather";
 import {
   getCityWeatherBackground,
-  getAllAvailableArtworks,
-  saveCustomArtChoice,
   getInstantBackground,
 } from "@/lib/aiWatercolorGenerator";
 import { WeatherIcon, wmoToIconCode } from "@/lib/weatherIcons";
-import { AiCustomSceneDialog } from "@/components/AiCustomSceneDialog";
 
 export interface TickerAlertItem {
   icon: string;
@@ -36,6 +33,7 @@ interface WeatherViewProps {
   isFav: boolean;
   onToggleFav: () => void;
   onRefresh: () => void;
+  onOpenGallery?: () => void;
 }
 
 export function WeatherView({
@@ -45,6 +43,7 @@ export function WeatherView({
   isFav,
   onToggleFav,
   onRefresh,
+  onOpenGallery,
 }: WeatherViewProps) {
   const { t } = useTranslation();
   const d = describe(w.current.code);
@@ -59,12 +58,8 @@ export function WeatherView({
   const [isAiGenerated, setIsAiGenerated] = useState(false);
   const [wearStyle, setWearStyle] = useState<"casual" | "business" | "sport">("casual");
 
-  // Custom photo, AI generator modal & Art switcher states
+  // Custom photo & AI background state
   const [customPhoto, setCustomPhoto] = useState<string | null>(null);
-  const [showArtMenu, setShowArtMenu] = useState(false);
-  const [showAiModal, setShowAiModal] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const artMenuRef = useRef<HTMLDivElement>(null);
 
   const tempC = w.unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
   const isRainy = w.current.code >= 51 && w.current.code <= 82;
@@ -84,26 +79,20 @@ export function WeatherView({
     }
   }, [w?.place?.name]);
 
-  // Close art menu when clicking outside
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (artMenuRef.current && !artMenuRef.current.contains(e.target as Node)) {
-        setShowArtMenu(false);
-      }
-    }
-    if (showArtMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showArtMenu]);
-
-  // Curated & Dynamic Landmark Scanner Background Effect
+  // Fetch / stream city watercolor background
   useEffect(() => {
     if (!w?.place?.name) return;
 
-    let isMounted = true;
+    try {
+      const saved = localStorage.getItem(`weather:custom-bg:${w.place.name.toLowerCase().trim()}`);
+      if (saved) {
+        setCustomPhoto(saved);
+        return;
+      }
+    } catch {}
+
+    setHeroBg(getInstantBackground(w.current.code));
+    setCustomPhoto(null);
     setIsGenerating(true);
 
     getCityWeatherBackground(
@@ -112,7 +101,6 @@ export function WeatherView({
       w.current.code,
       w.current.temp,
       (loadedUrl) => {
-        if (!isMounted) return;
         setHeroBg(loadedUrl);
         setIsAiGenerated(true);
       },
@@ -121,150 +109,17 @@ export function WeatherView({
       w.place.lon
     )
       .then((art) => {
-        if (!isMounted) return;
         setHeroBg(art.initialBg);
         setIsAiGenerated(art.isAi);
-        setIsGenerating(false);
       })
       .catch(() => {
-        if (!isMounted) return;
         setHeroBg(getInstantBackground(w.current.code));
-        setIsGenerating(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [w?.place?.name, w?.current?.code]);
-
-  // Cycle through next artwork
-  const handleCycleArtwork = async () => {
-    if (!w?.place?.name) return;
-    setIsGenerating(true);
-
-    try {
-      const available = getAllAvailableArtworks(
-        w.place.name,
-        w.current.code,
-        currentInfo.desc,
-        w.place.country,
-        w.place.lat,
-        w.place.lon
-      );
-
-      if (available.length > 0) {
-        const currentIndex = available.findIndex((url) => url === heroBg);
-        const nextIndex = (currentIndex + 1) % available.length;
-        const nextArt = available[nextIndex];
-
-        setHeroBg(nextArt);
-        setIsAiGenerated(true);
-        saveCustomArtChoice(w.place.name, nextArt);
-      }
-    } catch (err) {
-      console.warn("Could not cycle artwork:", err);
-    } finally {
-      setIsGenerating(false);
-      setShowArtMenu(false);
-    }
-  };
-
-  // Reset to auto artwork
-  const handleAutoArtwork = () => {
-    setShowArtMenu(false);
-    if (!w?.place?.name) return;
-    try {
-      localStorage.removeItem(`weather:custom-art:${w.place.name.toLowerCase().trim()}`);
-      localStorage.removeItem(`weather:custom-bg:${w.place.name.toLowerCase().trim()}`);
-    } catch {}
-    setCustomPhoto(null);
-    setIsGenerating(true);
-
-    getCityWeatherBackground(
-      w.place.name,
-      currentInfo.desc,
-      w.current.code,
-      w.current.temp,
-      (loadedUrl) => {
-        setHeroBg(loadedUrl);
-        setIsAiGenerated(true);
-      },
-      w.place.country,
-      w.place.lat,
-      w.place.lon
-    )
-      .then((art) => {
-        setHeroBg(art.initialBg);
-        setIsAiGenerated(art.isAi);
+        setIsAiGenerated(false);
       })
       .finally(() => setIsGenerating(false));
-  };
+  }, [w?.place?.name, w?.current?.code]);
 
-  // Handle image generation from AI modal
-  const handleCustomAiImageGenerated = (imageUrl: string, city: string) => {
-    try {
-      localStorage.setItem(`weather:custom-bg:${city.toLowerCase().trim()}`, imageUrl);
-      setCustomPhoto(imageUrl);
-      setIsAiGenerated(true);
-    } catch (e) {
-      console.warn("Storage quota exceeded for AI custom image:", e);
-    }
-  };
-
-  // Upload user's custom photo
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !w?.place?.name) return;
-    setShowArtMenu(false);
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const MAX_DIM = 1200;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height && width > MAX_DIM) {
-          height = Math.round((height * MAX_DIM) / width);
-          width = MAX_DIM;
-        } else if (height > MAX_DIM) {
-          width = Math.round((width * MAX_DIM) / height);
-          height = MAX_DIM;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
-          try {
-            localStorage.setItem(`weather:custom-bg:${w.place.name.toLowerCase().trim()}`, dataUrl);
-            setCustomPhoto(dataUrl);
-          } catch (err) {
-            console.warn("Storage quota exceeded for custom photo:", err);
-          }
-        }
-      };
-      if (typeof event.target?.result === "string") {
-        img.src = event.target.result;
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleRemoveCustomPhoto = () => {
-    setShowArtMenu(false);
-    if (!w?.place?.name) return;
-    try {
-      localStorage.removeItem(`weather:custom-bg:${w.place.name.toLowerCase().trim()}`);
-    } catch {}
-    setCustomPhoto(null);
-  };
-
-  // Helper: Determine if an hourly timestamp is daytime using sunrise/sunset
+  // Determine if an hourly timestamp is daytime using sunrise/sunset
   const isHourDaytime = (timeIso: string): number => {
     if (!w?.sun?.sunrise || !w?.sun?.sunset) return 1;
     const hourStr = timeIso.slice(11, 16);
@@ -323,7 +178,7 @@ export function WeatherView({
     backgroundPosition: "center",
   };
 
-  // Hourly forecast starting from CURRENT hour rather than midnight
+  // Hourly forecast starting from current hour
   const now = new Date();
   const currentHour = now.getHours();
   const currentHourIndex = w.hourly.findIndex((h) => {
@@ -335,16 +190,6 @@ export function WeatherView({
 
   return (
     <>
-      {/* Hidden file input for photo upload */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleImageUpload}
-        className="hidden"
-        aria-hidden="true"
-      />
-
       {/* 1. DISASTER / WEATHER ALERTS TICKER OR ALL CLEAR BANNER */}
       {disasters && disasters.length > 0 ? (
         <section className="mt-3">
@@ -406,7 +251,7 @@ export function WeatherView({
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/25 z-0" />
 
         <div className="relative z-10 p-5 flex flex-col justify-between min-h-[190px]">
-          {/* Top row: City Name, Favorite, Art Controls */}
+          {/* Top row: City Name, Favorite, AI Gallery shortcut */}
           <div className="flex items-start justify-between gap-2">
             <div>
               <div className="flex items-center gap-2">
@@ -424,314 +269,242 @@ export function WeatherView({
                   {isFav ? "⭐" : "☆"}
                 </button>
 
-                {/* 🎨 Art Dropdown & Split-Pill Next Arrow */}
-                <div className="relative" ref={artMenuRef}>
-                  <div className="inline-flex items-center rounded-full border border-white/20 bg-black/40 backdrop-blur-md shadow-xs text-xs text-white">
-                    <button
-                      type="button"
-                      onClick={() => setShowArtMenu(!showArtMenu)}
-                      className="flex items-center gap-1 px-2.5 py-1 hover:bg-white/10 transition-colors rounded-l-full"
-                      title="Art options"
-                    >
-                      <span>🎨</span>
-                      <span className="font-medium text-[11px]">Art</span>
-                      <span className="text-[9px] opacity-70">▾</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCycleArtwork}
-                      className="px-2 py-1 border-l border-white/20 hover:bg-white/15 transition-colors rounded-r-full font-bold text-xs"
-                      title="Next artwork"
-                    >
-                      →
-                    </button>
-                  </div>
-
-                  {/* Art Popover Menu */}
-                  {showArtMenu && (
-                    <div className="absolute left-0 mt-1.5 w-52 rounded-xl border border-white/15 bg-slate-900/95 p-1.5 text-xs text-white shadow-2xl backdrop-blur-xl z-50">
-                      {/* AI Generator Button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowArtMenu(false);
-                          setShowAiModal(true);
-                        }}
-                        className="flex w-full items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600/30 to-indigo-600/30 px-2.5 py-1.5 text-left text-purple-200 hover:from-purple-600/50 hover:to-indigo-600/50 transition-colors font-medium"
-                      >
-                        <span>✨</span>
-                        <span>Describe AI scene...</span>
-                      </button>
-
-                      <div className="my-1 border-t border-white/10" />
-
-                      <button
-                        type="button"
-                        onClick={handleAutoArtwork}
-                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-white/10 transition-colors"
-                      >
-                        <span>✨</span>
-                        <span>Auto (Weather match)</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleCycleArtwork}
-                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-white/10 transition-colors"
-                      >
-                        <span>🔄</span>
-                        <span>Next artwork (→)</span>
-                      </button>
-
-                      <div className="my-1 border-t border-white/10" />
-
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-white/10 transition-colors"
-                      >
-                        <span>📷</span>
-                        <span>Upload photo</span>
-                      </button>
-
-                      {customPhoto && (
-                        <button
-                          type="button"
-                          onClick={handleRemoveCustomPhoto}
-                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-red-300 hover:bg-red-500/20 transition-colors"
-                        >
-                          <span>🗑️</span>
-                          <span>Remove custom photo</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
+                {/* AI Gallery Shortcut Button */}
+                {onOpenGallery && (
+                  <button
+                    type="button"
+                    onClick={onOpenGallery}
+                    className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/40 px-2.5 py-1 text-[11px] font-medium text-white/90 backdrop-blur-md hover:bg-white/20 transition-all active:scale-95 shadow-xs"
+                    title="Open AI Gallery"
+                  >
+                    <span>✨</span>
+                    <span>AI Art</span>
+                  </button>
+                )}
               </div>
 
-              {/* Main Weather Icon + Temp + Condition */}
-              <div className="mt-2 flex items-center gap-4">
-                <WeatherIcon
-                  wmoCode={w.current.code}
-                  isDay={w.current.is_day}
-                  description={currentInfo.desc}
-                  cityName={w.place.name}
-                  aqi={w.current.aqi}
-                  className="w-16 h-16 sm:w-20 sm:h-20 shrink-0"
-                  fallbackEmoji={d.icon}
-                />
-                <div>
-                  <div className="flex items-baseline gap-1">
-                    <p className="text-6xl font-bold tracking-tight text-white drop-shadow-md">
-                      {Math.round(w.current.temp)}
-                    </p>
-                    <span className="text-2xl font-semibold text-slate-200 drop-shadow-sm">
-                      {tempSymbol}
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-200 drop-shadow-sm">
-                    {currentInfo.desc} · {t("feels_like", "Feels like")} {Math.round(w.current.feels)}
-                    {tempSymbol}
-                  </p>
-                </div>
-              </div>
+              <p className="text-xs text-white/80 drop-shadow-sm flex items-center gap-1.5 mt-0.5">
+                <span>{currentInfo.desc}</span>
+                <span>•</span>
+                <span>Feels like {w.current.feelsLike}°{tempSymbol}</span>
+              </p>
             </div>
 
+            {/* Refresh Pill */}
             <button
-              type="button"
               onClick={onRefresh}
               disabled={refreshing}
+              className="flex items-center gap-1 rounded-full border border-white/20 bg-black/30 backdrop-blur-md px-2.5 py-1 text-xs text-white/90 hover:bg-white/10 transition-colors"
               title="Refresh forecast"
-              aria-label="Refresh forecast"
-              className="flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/30 backdrop-blur-md px-2.5 py-1 text-xs text-white hover:bg-black/50 transition-colors"
             >
-              <span className={`inline-block ${refreshing ? "animate-spin" : ""}`}>🔄</span>
-              <span>{formatTimeAgo(w.fetchedAt)}</span>
+              <span className={`text-xs ${refreshing ? "animate-spin" : ""}`}>↻</span>
+              <span className="text-[10px]">{formatTimeAgo(w.fetchedAt)}</span>
             </button>
           </div>
-        </div>
 
-        {/* Badge in bottom right */}
-        <div className="absolute bottom-3 right-3 z-20">
-          {customPhoto ? (
-            <div className="flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-medium text-emerald-200 backdrop-blur-md border border-emerald-400/30">
-              <span>📷 Your photo</span>
+          {/* Bottom row: Big Temperature, High/Low, and Icon */}
+          <div className="mt-6 flex items-end justify-between">
+            <div className="flex items-baseline gap-2">
+              <span className="text-6xl font-black tracking-tighter text-white drop-shadow-lg">
+                {w.current.temp}°
+              </span>
+              <div className="text-xs text-white/80 font-medium">
+                <div>H: {w.today.maxTemp}°</div>
+                <div>L: {w.today.minTemp}°</div>
+              </div>
             </div>
-          ) : isAiGenerated ? (
-            <div className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-purple-600/80 to-indigo-600/80 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-md shadow-sm border border-purple-400/30">
-              <span>✨ AI vibrant watercolor</span>
+
+            <div className="flex flex-col items-end">
+              <div className="relative">
+                <WeatherIcon
+                  code={w.current.code}
+                  isDay={w.current.is_day ?? 1}
+                  className="h-16 w-16 drop-shadow-md"
+                />
+              </div>
+
+              {/* Status Badge */}
+              <div className="mt-1 flex items-center gap-1 text-[10px] text-white/80">
+                {isGenerating ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2 py-0.5 border border-white/10">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping" />
+                    Matching art…
+                  </span>
+                ) : customPhoto ? (
+                  <button
+                    type="button"
+                    onClick={onOpenGallery}
+                    className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2 py-0.5 border border-white/15 hover:bg-white/15 transition-colors cursor-pointer"
+                  >
+                    <span>📷</span>
+                    <span>Custom background</span>
+                  </button>
+                ) : isAiGenerated ? (
+                  <button
+                    type="button"
+                    onClick={onOpenGallery}
+                    className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2 py-0.5 border border-white/15 hover:bg-white/15 transition-colors cursor-pointer"
+                  >
+                    <span>✨</span>
+                    <span>AI vibrant watercolor</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onOpenGallery}
+                    className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2 py-0.5 border border-white/10 hover:bg-white/15 transition-colors cursor-pointer"
+                  >
+                    <span>🎨</span>
+                    <span>Vibrant atmosphere</span>
+                  </button>
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[11px] font-medium text-slate-200 backdrop-blur-md border border-white/10">
-              <span>Vibrant atmosphere</span>
-            </div>
-          )}
+          </div>
         </div>
       </section>
 
-      {/* 3. WHAT TO WEAR SECTION */}
-      <section className="mt-4 rounded-xl border border-primary/20 bg-gradient-to-br from-card via-card to-accent/30 p-4 text-card-foreground shadow-sm">
+      {/* 3. WHAT TO WEAR ADVICE */}
+      <section className="mt-4 rounded-2xl border border-border bg-card p-4 shadow-sm text-card-foreground">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
           <div className="flex items-center gap-2">
-            <span className="text-xl">👔</span>
-            <h3 className="font-semibold">{t("what_to_wear", "What to Wear Today")}</h3>
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-              Live weather advice
-            </span>
+            <span className="text-xl">👕</span>
+            <div>
+              <h3 className="font-semibold text-sm leading-none">{t("what_to_wear", "What to Wear")}</h3>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Tailored for {currentInfo.desc.toLowerCase()} & {w.current.temp}°{tempSymbol}
+              </p>
+            </div>
           </div>
 
-          <div className="flex gap-1 rounded-lg border border-border/60 bg-muted/50 p-0.5 text-xs">
-            {(["casual", "business", "sport"] as const).map((style) => (
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-0.5 text-xs">
+            {(["casual", "business", "sport"] as const).map((mode) => (
               <button
-                key={style}
-                type="button"
-                onClick={() => setWearStyle(style)}
-                className={`rounded-md px-2.5 py-1 font-medium capitalize transition-colors ${
-                  wearStyle === style
-                    ? "bg-primary text-primary-foreground shadow-xs"
+                key={mode}
+                onClick={() => setWearStyle(mode)}
+                className={`rounded-md px-2.5 py-1 capitalize font-medium transition-colors ${
+                  wearStyle === mode
+                    ? "bg-card text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {style}
+                {mode}
               </button>
             ))}
           </div>
         </div>
 
-        <p className="mt-3 text-sm leading-relaxed font-medium">{tailoredAdvice}</p>
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          {tailoredAdvice}
+        </p>
       </section>
 
       {/* 4. KEY METRICS GRID */}
-      <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <span className="text-xs text-muted-foreground">{t("humidity", "Humidity")}</span>
-          <p className="mt-1 text-2xl font-bold">{Math.round(w.current.humidity)}%</p>
+      <section className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div className="rounded-xl border border-border bg-card p-3 shadow-xs">
+          <div className="text-[11px] font-medium text-muted-foreground flex items-center justify-between">
+            <span>Wind</span>
+            <span>💨</span>
+          </div>
+          <div className="mt-1 text-lg font-bold">
+            {w.current.windSpeed} <span className="text-xs font-normal text-muted-foreground">{windUnit}</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground">{w.current.windDirection}° direction</div>
         </div>
 
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <span className="text-xs text-muted-foreground">{t("wind", "Wind")}</span>
-          <p className="mt-1 text-2xl font-bold">
-            {Math.round(w.current.wind)} {windUnit}
-          </p>
+        <div className="rounded-xl border border-border bg-card p-3 shadow-xs">
+          <div className="text-[11px] font-medium text-muted-foreground flex items-center justify-between">
+            <span>Humidity</span>
+            <span>💧</span>
+          </div>
+          <div className="mt-1 text-lg font-bold">{w.current.humidity}%</div>
+          <div className="text-[10px] text-muted-foreground">Dew point comfortable</div>
         </div>
 
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <span className="text-xs text-muted-foreground">{t("uv", "UV Index")}</span>
-          <p className="mt-1 text-2xl font-bold">
-            {w.current.uvIndex} <span className="text-xs font-normal">({uvCategory(w.current.uvIndex)})</span>
-          </p>
+        <div className="rounded-xl border border-border bg-card p-3 shadow-xs">
+          <div className="text-[11px] font-medium text-muted-foreground flex items-center justify-between">
+            <span>UV Index</span>
+            <span>☀️</span>
+          </div>
+          <div className="mt-1 text-lg font-bold">{w.current.uvIndex ?? "—"}</div>
+          <div className="text-[10px] text-muted-foreground">{uvCategory(w.current.uvIndex ?? 0)}</div>
         </div>
 
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <span className="text-xs text-muted-foreground">{t("air_quality", "Air Quality")}</span>
-          <p className="mt-1 text-2xl font-bold">
-            {w.current.aqi !== undefined ? (
-              <>
-                {w.current.aqi}{" "}
-                <span className={`text-xs font-semibold ${aqiCategory(w.current.aqi).color}`}>
-                  ({aqiCategory(w.current.aqi).label})
-                </span>
-              </>
-            ) : (
-              "--"
-            )}
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <span className="text-xs text-muted-foreground">{t("precipitation", "Precipitation")}</span>
-          <p className="mt-1 text-2xl font-bold">
-            {w.current.precipitation} {precipUnit}
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-xs">
-          <span className="text-xs text-muted-foreground">
-            {t("sunrise", "Sunrise")} / {t("sunset", "Sunset")}
-          </span>
-          <p className="mt-1 text-base font-semibold">
-            {w.sun?.sunrise || "--:--"} · {w.sun?.sunset || "--:--"}
-          </p>
+        <div className="rounded-xl border border-border bg-card p-3 shadow-xs">
+          <div className="text-[11px] font-medium text-muted-foreground flex items-center justify-between">
+            <span>Air Quality</span>
+            <span>🍃</span>
+          </div>
+          <div className="mt-1 text-lg font-bold">{w.current.aqi ?? "—"}</div>
+          <div className="text-[10px] text-muted-foreground">{aqiCategory(w.current.aqi ?? 0).label}</div>
         </div>
       </section>
 
-      {/* 5. HOURLY FORECAST (Starts at Current Hour) */}
-      <section className="mt-4 rounded-xl border border-border/60 bg-card p-4 shadow-xs">
-        <h3 className="font-semibold text-sm mb-3">
-          {t("hourly", "Hourly Forecast")} · {t("today", "Today")}
+      {/* 5. HOURLY FORECAST (24 HOURS) */}
+      <section className="mt-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <h3 className="font-semibold text-xs tracking-wider uppercase text-muted-foreground mb-3">
+          24-Hour Forecast
         </h3>
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
           {displayHours.map((h, i) => {
-            const hourIsDay = isHourDaytime(h.time);
-            const hourInfo = wmoToIconCode(h.code, hourIsDay, w.place.name);
-            const hEmoji = describe(h.code).icon;
+            const isDayForHour = isHourDaytime(h.time);
             return (
               <div
                 key={i}
-                className="flex w-[74px] shrink-0 flex-col items-center rounded-lg border border-border/40 bg-muted/40 p-2 text-center"
+                className="flex flex-col items-center justify-between min-w-[72px] shrink-0 rounded-xl border border-border/60 bg-muted/20 p-2.5 text-center"
               >
-                <span className="text-xs text-muted-foreground">{h.time.slice(11, 16)}</span>
-                <div className="my-1 flex h-8 w-8 items-center justify-center">
-                  <WeatherIcon
-                    wmoCode={h.code}
-                    isDay={hourIsDay}
-                    description={hourInfo.desc}
-                    className="w-8 h-8"
-                    fallbackEmoji={hEmoji}
-                  />
-                </div>
-                <span className="text-sm font-bold">
-                  {Math.round(h.temp)}
-                  {tempSymbol}
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  {i === 0 ? "Now" : h.time.slice(11, 16)}
                 </span>
-                <span className="mt-1 text-[10px] text-muted-foreground line-clamp-2 break-words leading-tight">
-                  {hourInfo.desc}
+                <WeatherIcon
+                  code={h.code}
+                  isDay={isDayForHour}
+                  className="my-1.5 h-7 w-7"
+                />
+                <span className="text-sm font-bold">{h.temp}°</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2 max-w-[65px] leading-tight">
+                  {describe(h.code)}
                 </span>
+                {h.precipProb > 0 && (
+                  <span className="mt-1 text-[9px] font-medium text-blue-500">
+                    {h.precipProb}%
+                  </span>
+                )}
               </div>
             );
           })}
         </div>
       </section>
 
-      {/* 6. 7-DAY FORECAST */}
-      <section className="mt-4 rounded-xl border border-border/60 bg-card p-4 shadow-xs">
-        <h3 className="font-semibold text-sm mb-3">{t("seven_day", "7-day forecast")}</h3>
-        <div className="divide-y divide-border/40">
-          {w.daily.map((dItem, i) => {
-            const dayInfo = wmoToIconCode(dItem.code, 1, w.place.name);
-            const dayEmoji = describe(dItem.code).icon;
-            const dayName =
-              i === 0
-                ? t("today", "Today")
-                : new Date(dItem.date + "T12:00:00").toLocaleDateString(undefined, {
-                    weekday: "short",
-                  });
+      {/* 6. 7-DAY EXTENDED FORECAST */}
+      <section className="mt-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <h3 className="font-semibold text-xs tracking-wider uppercase text-muted-foreground mb-3">
+          7-Day Forecast
+        </h3>
+
+        <div className="divide-y divide-border/60">
+          {w.daily.map((day, i) => {
+            const dObj = new Date(day.date + "T12:00:00");
+            const dayName = i === 0 ? "Today" : dObj.toLocaleDateString(undefined, { weekday: "short" });
+
             return (
-              <div key={dItem.date} className="flex items-center justify-between gap-2 py-2.5 text-sm">
-                <span className="w-14 shrink-0 font-medium">{dayName}</span>
-                <div className="flex flex-1 items-center gap-2 min-w-0">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center">
-                    <WeatherIcon
-                      wmoCode={dItem.code}
-                      isDay={1}
-                      description={dayInfo.desc}
-                      className="w-7 h-7"
-                      fallbackEmoji={dayEmoji}
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground whitespace-normal break-words leading-snug">
-                    {dayInfo.desc}
-                  </span>
+              <div key={day.date} className="flex items-center justify-between py-2.5 text-xs">
+                <span className="w-14 font-medium">{dayName}</span>
+
+                <div className="flex items-center gap-2 flex-1 px-2">
+                  <WeatherIcon code={day.code} isDay={1} className="h-5 w-5 shrink-0" />
+                  <span className="text-muted-foreground truncate">{describe(day.code)}</span>
                 </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="font-bold">
-                    {Math.round(dItem.max)}
-                    {tempSymbol}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {Math.round(dItem.min)}
-                    {tempSymbol}
-                  </span>
+
+                <div className="flex items-center gap-3">
+                  {day.precipProb > 0 && (
+                    <span className="text-[10px] font-medium text-blue-500 w-8 text-right">
+                      {day.precipProb}%
+                    </span>
+                  )}
+                  <span className="font-bold w-7 text-right">{day.maxTemp}°</span>
+                  <span className="text-muted-foreground w-7 text-right">{day.minTemp}°</span>
                 </div>
               </div>
             );
@@ -739,45 +512,10 @@ export function WeatherView({
         </div>
       </section>
 
-      {/* Attribution */}
-      <p className="mt-6 text-center text-xs text-muted-foreground">
-        Data by{" "}
-        <a
-          className="underline hover:text-foreground"
-          href="https://open-meteo.com/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Open-Meteo
-        </a>
-        ,{" "}
-        <a
-          className="underline hover:text-foreground"
-          href="https://earthquake.usgs.gov/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          USGS
-        </a>
-        , TMD &{" "}
-        <a
-          className="underline hover:text-foreground"
-          href="https://www.weather.gov/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          NWS
-        </a>
-      </p>
-
-      {/* AI Custom Scene Generator Dialog */}
-      <AiCustomSceneDialog
-        isOpen={showAiModal}
-        onClose={() => setShowAiModal(false)}
-        defaultCity={w.place.name}
-        weatherDesc={currentInfo.desc}
-        onImageGenerated={handleCustomAiImageGenerated}
-      />
+      {/* Attribution footer */}
+      <footer className="mt-6 text-center text-[11px] text-muted-foreground/70 pb-4">
+        Weather data by Open-Meteo • Curated AI Watercolor Backgrounds
+      </footer>
     </>
   );
 }
