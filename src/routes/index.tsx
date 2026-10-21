@@ -706,7 +706,7 @@ function Index() {
           </div>
         )}
 
-               {/* MAIN WEATHER VIEW */}
+        {/* MAIN WEATHER VIEW */}
         {weather ? (
           <WeatherView
             w={weather}
@@ -724,6 +724,38 @@ function Index() {
             <span className="mt-3 text-xs">Loading weather data…</span>
           </div>
         ) : null}
+
+        {/* LOCATION PERMISSION DIALOG */}
+        {showLocDialog && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+          >
+            <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-2xl">
+              <h3 className="text-base font-bold">Use your location?</h3>
+              <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+                Your coordinates are sent only to Open-Meteo for the forecast. No tracking or accounts.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLocDialog(false)}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={useLocation}
+                  className="rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90"
+                >
+                  Allow location
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* DEDICATED AI GALLERY MODAL */}
         <AiGalleryModal
@@ -748,3 +780,7 @@ function Index() {
             }
           }}
         />
+      </main>
+    </div>
+  );
+}
