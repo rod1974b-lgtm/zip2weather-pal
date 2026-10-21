@@ -1,3 +1,4 @@
+// src/components/AppMenu.tsx
 import { useState, useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -146,12 +147,12 @@ export function AppMenu({
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-haspopup="true"
-        aria-label={t("settings") || "Settings"}
-        title={t("settings") || "Settings"}
+        aria-label={t("settings", "Settings")}
+        title={t("settings", "Settings")}
         className="flex items-center gap-1.5 rounded-lg border border-input bg-card px-3 py-1.5 text-sm font-medium text-card-foreground shadow-xs hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
       >
         <span>⚙️</span>
-        <span>{t("settings") || "Settings"}</span>
+        <span>{t("settings", "Settings")}</span>
         <span className="text-xs opacity-60">▾</span>
       </button>
 
@@ -172,12 +173,12 @@ export function AppMenu({
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border pb-2 mb-3">
-            <span className="font-semibold text-sm">{t("settings") || "Settings"}</span>
+            <span className="font-semibold text-sm">{t("settings", "Settings")}</span>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
               className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted font-bold"
-              aria-label="Close settings"
+              aria-label={t("close", "Close")}
             >
               ✕
             </button>
@@ -186,7 +187,7 @@ export function AppMenu({
           <div className="space-y-3 text-xs">
             {/* Unit Preference */}
             <div>
-              <label className="block font-medium mb-1 text-muted-foreground">Units</label>
+              <label className="block font-medium mb-1 text-muted-foreground">{t("units", "Units")}</label>
               <div className="grid grid-cols-2 gap-1 rounded-lg border border-input bg-muted/40 p-0.5">
                 <button
                   type="button"
@@ -215,7 +216,7 @@ export function AppMenu({
 
             {/* Language */}
             <div>
-              <label className="block font-medium mb-1 text-muted-foreground">{t("language") || "Language"}</label>
+              <label className="block font-medium mb-1 text-muted-foreground">{t("language", "Language")}</label>
               <select
                 value={i18n.language || "en"}
                 onChange={(e) => handleLangSelect(e.target.value)}
@@ -231,7 +232,7 @@ export function AppMenu({
 
             {/* Text Size */}
             <div>
-              <label className="block font-medium mb-1 text-muted-foreground">Text size</label>
+              <label className="block font-medium mb-1 text-muted-foreground">{t("text_size", "Text size")}</label>
               <select
                 value={activeFont}
                 onChange={(e) => handleFontSelect(e.target.value)}
@@ -247,7 +248,7 @@ export function AppMenu({
 
             {/* Sky Background */}
             <div>
-              <label className="block font-medium mb-1 text-muted-foreground">Sky background</label>
+              <label className="block font-medium mb-1 text-muted-foreground">{t("sky_background", "Sky background")}</label>
               <select
                 value={activeSky}
                 onChange={(e) => handleSkySelect(e.target.value)}
@@ -269,7 +270,7 @@ export function AppMenu({
                 className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-input px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 <span>🛡️</span>
-                <span>Privacy Policy</span>
+                <span>{t("privacy_policy", "Privacy Policy")}</span>
               </Link>
             </div>
           </div>
