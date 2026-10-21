@@ -13,6 +13,9 @@ export interface TickerAlertItem {
   tag: string;
   text: string;
   severity: "disaster" | "warning" | "caution" | "clear" | "advisory" | string;
+  tagKey?: string;
+  textKey?: string;
+  textParams?: Record<string, string | number>;
 }
 
 function formatTimeAgo(timestamp: number | null | undefined): string {
@@ -58,6 +61,16 @@ function getAqiLabel(aqi: number, t: (k: string, f?: string) => string): string 
   if (aqi <= 200) return t("aqi_unhealthy", "Unhealthy");
   return t("aqi_very_unhealthy", "Very Unhealthy");
 }
+
+const TAG_TRANSLATION_MAP: Record<string, string> = {
+  "SEVERE THUNDERSTORM WARNING": "alert_thunderstorm_tag",
+  "WINTER WEATHER ADVISORY": "alert_winter_tag",
+  "HEAVY PRECIPITATION ADVISORY": "alert_rain_tag",
+  "RAIN ONSET ADVISORY": "alert_rain_onset_tag",
+  "EARTHQUAKE ALERT": "alert_earthquake_tag",
+  "RIVER FLOOD WATCH": "alert_flood_tag",
+  "ALL CLEAR": "all_clear",
+};
 
 interface WeatherViewProps {
   w: Weather;
@@ -118,44 +131,32 @@ export function WeatherView({
   useEffect(() => {
     if (!w?.place?.name) return;
     try {
-      const saved = localStorage.getItem(`weather:custom-bg:${w.place.name.toLowerCase().trim()}`);
-      setCustomPhoto(saved || null);
-    } catch {
-      setCustomPhoto(null);
-    }
-  }, [w?.place?.name]);
-
-  // Fetch / stream city watercolor background
-  useEffect(() => {
-    if (!w?.place?.name) return;
-
-    try {
-      const saved = localStorage.getItem(`weather:custom-bg:${w.place.name.toLowerCase().trim()}`);
-      if (saved) {
-        setHeroBg(saved);
-        setIsAiGenerated(true);
-        setIsGenerating(false);
+      const stored = localStorage.getItem(`weather:custom-bg:${w.place.name.toLowerCase().trim()}`);
+      if (stored) {
+        setCustomPhoto(stored);
         return;
       }
     } catch {}
+    setCustomPhoto(null);
+  }, [w?.place?.name]);
 
+  // Load AI curated or regional artwork
+  useEffect(() => {
+    let cancelled = false;
     const instantGradient = getInstantBackground(w.current.code);
     setHeroBg(instantGradient);
-    setIsAiGenerated(false);
     setIsGenerating(true);
-
-    let cancelled = false;
 
     getCityWeatherBackground(
       w.place.name,
       w.current.code,
-      currentInfo.desc,
+      currentInfo.desc || "Clear",
       w.place.country,
-      (streamingUrl) => {
-        if (!cancelled) {
-          setHeroBg(streamingUrl);
-          setIsGenerating(false);
-          setIsAiGenerated(true);
+      w.current.temp,
+      w.unit,
+      (streamingBg) => {
+        if (!cancelled && streamingBg) {
+          setHeroBg(streamingBg);
         }
       }
     )
@@ -178,25 +179,25 @@ export function WeatherView({
     };
   }, [w?.place?.name, w?.current?.code]);
 
-  // Clothing advice text
+  // Localized clothing advice text
   const tailoredAdvice = (() => {
     if (wearStyle === "business") {
-      if (isFreezing) return "Wool overcoat, tailored trousers, cashmere knit & warm thermal layers.";
-      if (isRainy) return "Trench coat or water-repellent blazer, dress leather shoes & compact umbrella.";
-      if (isWarm) return "Lightweight linen or breathable cotton suit, open collar, loafers.";
-      return "Structured blazer, pressed chinos or tailored trousers, breathable layer.";
+      if (isFreezing) return t("wear_biz_freezing", "Wool overcoat, tailored trousers, cashmere knit & warm thermal layers.");
+      if (isRainy) return t("wear_biz_rain", "Trench coat or water-repellent blazer, dress leather shoes & compact umbrella.");
+      if (isWarm) return t("wear_biz_warm", "Lightweight linen or breathable cotton suit, open collar, loafers.");
+      return t("wear_biz_mild", "Structured blazer, pressed chinos or tailored trousers, breathable layer.");
     }
     if (wearStyle === "sport") {
-      if (isFreezing) return "Thermal base layers, windbreaker, running gloves & fleece beanie.";
-      if (isRainy) return "Waterproof running shell, moisture-wicking gear & high-traction shoes.";
-      if (isWarm) return "Ultralight singlet or tee, athletic shorts, cap & sun protection.";
-      return "Moisture-wicking athletic pullover, training joggers & performance sneakers.";
+      if (isFreezing) return t("wear_sport_freezing", "Thermal base layers, windbreaker, running gloves & fleece beanie.");
+      if (isRainy) return t("wear_sport_rain", "Waterproof running shell, moisture-wicking gear & high-traction shoes.");
+      if (isWarm) return t("wear_sport_warm", "Ultralight singlet or tee, athletic shorts, cap & sun protection.");
+      return t("wear_sport_mild", "Moisture-wicking athletic pullover, training joggers & performance sneakers.");
     }
     // Casual
-    if (isFreezing) return "Heavy winter jacket, cozy hoodie, warm knit scarf & insulated boots.";
-    if (isRainy) return "Rain jacket or hooded layer, waterproof footwear & a sturdy umbrella.";
-    if (isWarm) return "Breathable cotton tee, light shorts or relaxed pants, sunglasses.";
-    return "Light layer, comfortable crewneck sweater or denim jacket, everyday sneakers.";
+    if (isFreezing) return t("wear_cas_freezing", "Heavy winter jacket, cozy hoodie, warm knit scarf & insulated boots.");
+    if (isRainy) return t("wear_cas_rain", "Rain jacket or hooded layer, waterproof footwear & a sturdy umbrella.");
+    if (isWarm) return t("wear_cas_warm", "Breathable cotton tee, light shorts or relaxed pants, sunglasses.");
+    return t("wear_cas_mild", "Light layer, comfortable crewneck sweater or denim jacket, everyday sneakers.");
   })();
 
   // 24-hour forecast
@@ -249,15 +250,33 @@ export function WeatherView({
 
               <div className="relative flex-1 overflow-hidden whitespace-nowrap">
                 <div className="inline-flex gap-8 animate-ticker hover:[animation-play-state:paused]">
-                  {disasters.concat(disasters).map((alert, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-1.5 shrink-0">
-                      <span>{alert.icon}</span>
-                      <strong className="font-semibold underline decoration-dotted underline-offset-2">
-                        {alert.tag}:
-                      </strong>
-                      <span>{alert.text}</span>
-                    </span>
-                  ))}
+                  {disasters.concat(disasters).map((alert, idx) => {
+                    const tagKey = alert.tagKey || TAG_TRANSLATION_MAP[alert.tag];
+                    const displayTag = tagKey ? t(tagKey, alert.tag) : alert.tag;
+
+                    let displayText = alert.text;
+                    if (alert.textKey) {
+                      if (alert.textKey === "alert_rain_onset_text" && alert.textParams) {
+                        displayText = t("alert_rain_onset_text", {
+                          time: alert.textParams.time,
+                          prob: alert.textParams.prob,
+                          defaultValue: alert.text,
+                        });
+                      } else {
+                        displayText = t(alert.textKey, alert.text);
+                      }
+                    }
+
+                    return (
+                      <span key={idx} className="inline-flex items-center gap-1.5 shrink-0">
+                        <span>{alert.icon}</span>
+                        <strong className="font-semibold underline decoration-dotted underline-offset-2">
+                          {displayTag}:
+                        </strong>
+                        <span>{displayText}</span>
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -270,7 +289,7 @@ export function WeatherView({
                 {t("all_clear", "ALL CLEAR")}
               </span>
               <span className="opacity-80 hidden sm:inline">
-                • No severe weather watches active in this region
+                • {t("all_clear_sub", "No severe weather watches active in this region")}
               </span>
             </span>
             <span className="text-[10px] opacity-75 font-mono">
@@ -318,24 +337,32 @@ export function WeatherView({
             <button
               onClick={onRefresh}
               disabled={refreshing}
-              className="flex items-center gap-1 rounded-full border border-white/20 bg-black/30 backdrop-blur-md px-2.5 py-1 text-xs text-white/90 hover:bg-white/10 transition-colors cursor-pointer"
+              className="group flex items-center gap-1.5 rounded-full bg-black/40 backdrop-blur-md px-3 py-1 text-xs border border-white/15 hover:bg-white/20 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
               title={t("refresh", "Refresh forecast")}
             >
-              <span className={`text-xs ${refreshing ? "animate-spin" : ""}`}>↻</span>
-              <span className="text-[10px]">{formatTimeAgo(w.fetchedAt)}</span>
+              <span className={`inline-block text-xs transition-transform duration-500 ${refreshing ? "animate-spin" : "group-hover:rotate-180"}`}>
+                🔄
+              </span>
+              <span className="text-[11px] font-medium tracking-wide">
+                {refreshing ? "..." : formatTimeAgo(w.fetchedAt)}
+              </span>
             </button>
           </div>
 
-          {/* Bottom row: Big Temperature, High/Low, and Icon */}
-          <div className="mt-6 flex items-end justify-between">
-            <div className="flex items-baseline gap-2">
-              <span className="text-6xl font-black tracking-tighter text-white drop-shadow-lg">
-                {Math.round(w.current.temp)}°
-              </span>
-              <div className="text-xs text-white/80 font-medium">
-                <div>H: {highTemp}°</div>
-                <div>L: {lowTemp}°</div>
+          {/* Bottom row: Temperature & Weather Icon */}
+          <div className="flex items-end justify-between mt-6">
+            <div>
+              <div className="flex items-baseline">
+                <span className="text-6xl sm:text-7xl font-extrabold tracking-tight drop-shadow-lg">
+                  {Math.round(w.current.temp)}
+                </span>
+                <span className="text-2xl sm:text-3xl font-light text-white/90 drop-shadow-md ml-1">
+                  {tempSymbol}
+                </span>
               </div>
+              <p className="text-xs text-white/80 mt-1 drop-shadow-sm font-medium">
+                H: {highTemp}°{tempSymbol} • L: {lowTemp}°{tempSymbol}
+              </p>
             </div>
 
             <div className="flex flex-col items-end">
@@ -387,7 +414,7 @@ export function WeatherView({
             <div>
               <h3 className="font-semibold text-sm leading-none">{t("what_to_wear", "What to Wear Today")}</h3>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                {t("tailored_for", "Tailored for")} {localizedDesc.toLowerCase()} & {Math.round(w.current.temp)}°{tempSymbol}
+                {t("tailored_for", "Tailored for")} {localizedDesc} & {Math.round(w.current.temp)}°{tempSymbol}
               </p>
             </div>
           </div>
@@ -419,118 +446,151 @@ export function WeatherView({
         <div className="rounded-xl border border-border bg-card p-3 shadow-xs">
           <div className="text-[11px] font-medium text-muted-foreground flex items-center justify-between">
             <span>{t("wind", "Wind")}</span>
-            <span>💨</span>
+            <span className="text-xs">💨</span>
           </div>
-          <div className="mt-1 text-lg font-bold">
+          <p className="text-lg font-semibold mt-1">
             {Math.round(w.current.wind)} <span className="text-xs font-normal text-muted-foreground">{windUnit}</span>
-          </div>
-          <div className="text-[10px] text-muted-foreground">{t("surface_breeze", "Surface breeze")}</div>
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {t("surface_breeze", "Surface breeze")}
+          </p>
         </div>
 
         <div className="rounded-xl border border-border bg-card p-3 shadow-xs">
           <div className="text-[11px] font-medium text-muted-foreground flex items-center justify-between">
             <span>{t("humidity", "Humidity")}</span>
-            <span>💧</span>
+            <span className="text-xs">💧</span>
           </div>
-          <div className="mt-1 text-lg font-bold">{w.current.humidity}%</div>
-          <div className="text-[10px] text-muted-foreground">{t("dew_comfortable", "Dew point comfortable")}</div>
+          <p className="text-lg font-semibold mt-1">
+            {w.current.humidity}<span className="text-xs font-normal text-muted-foreground">%</span>
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {t("dew_comfortable", "Dew point comfortable")}
+          </p>
         </div>
 
         <div className="rounded-xl border border-border bg-card p-3 shadow-xs">
           <div className="text-[11px] font-medium text-muted-foreground flex items-center justify-between">
             <span>{t("uv", "UV Index")}</span>
-            <span>☀️</span>
+            <span className="text-xs">☀️</span>
           </div>
-          <div className="mt-1 text-lg font-bold">{w.current.uvIndex ?? "—"}</div>
-          <div className="text-[10px] text-muted-foreground">{getUvLabel(w.current.uvIndex ?? 0, t)}</div>
+          <p className="text-lg font-semibold mt-1">
+            {w.current.uvIndex ?? "—"}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {getUvLabel(w.current.uvIndex ?? 0, t)}
+          </p>
         </div>
 
         <div className="rounded-xl border border-border bg-card p-3 shadow-xs">
           <div className="text-[11px] font-medium text-muted-foreground flex items-center justify-between">
             <span>{t("air_quality", "Air Quality")}</span>
-            <span>🍃</span>
+            <span className="text-xs">🍃</span>
           </div>
-          <div className="mt-1 text-lg font-bold">{w.current.aqi ?? "—"}</div>
-          <div className="text-[10px] text-muted-foreground">{getAqiLabel(w.current.aqi ?? 0, t)}</div>
+          <p className="text-lg font-semibold mt-1">
+            {w.current.aqi !== undefined ? w.current.aqi : "—"}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {w.current.aqi !== undefined ? getAqiLabel(w.current.aqi, t) : t("aqi_moderate", "Moderate")}
+          </p>
         </div>
       </section>
 
-      {/* 5. HOURLY FORECAST (24 HOURS) */}
+      {/* 5. 24-HOUR HOURLY FORECAST */}
       <section className="mt-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
         <h3 className="font-semibold text-xs tracking-wider uppercase text-muted-foreground mb-3">
           {t("hourly", "24-Hour Forecast")}
         </h3>
 
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
+        <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-border">
           {displayHours.map((h, i) => {
-            const isDayForHour = isHourDaytime(h.time);
+            const timeOnly = h.time.slice(11, 16);
+            const isDay = isHourDaytime(h.time);
             return (
               <div
                 key={i}
-                className="flex flex-col items-center justify-between min-w-[72px] shrink-0 rounded-xl border border-border/60 bg-muted/20 p-2.5 text-center"
+                className="flex flex-col items-center justify-between min-w-[70px] rounded-xl border border-border/60 bg-muted/20 p-2.5 text-center shrink-0"
               >
                 <span className="text-[11px] font-medium text-muted-foreground">
-                  {i === 0 ? t("now", "Now") : h.time.slice(11, 16)}
+                  {i === 0 ? t("now", "Now") : timeOnly}
                 </span>
-                <WeatherIcon
-                  wmoCode={h.code}
-                  isDay={isDayForHour}
-                  className="my-1.5 h-7 w-7"
-                />
-                <span className="text-sm font-bold">{Math.round(h.temp)}°</span>
-                <span className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2 max-w-[65px] leading-tight">
-                  {getConditionLabel(h.code, t)}
+
+                <div className="my-1.5">
+                  <WeatherIcon
+                    wmoCode={h.code}
+                    isDay={isDay}
+                    className="h-8 w-8 drop-shadow-xs"
+                  />
+                </div>
+
+                <span className="text-xs font-semibold">
+                  {Math.round(h.temp)}°
                 </span>
-                {h.precipProb > 0 && (
-                  <span className="mt-1 text-[9px] font-medium text-blue-500">
-                    {h.precipProb}%
-                  </span>
-                )}
+
+                <span className="text-[10px] text-sky-600 dark:text-sky-400 font-medium mt-0.5">
+                  {h.precipProb > 0 ? `${h.precipProb}%` : "—"}
+                </span>
               </div>
             );
           })}
         </div>
       </section>
 
-      {/* 6. 7-DAY EXTENDED FORECAST */}
+      {/* 6. 7-DAY FORECAST */}
       <section className="mt-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
         <h3 className="font-semibold text-xs tracking-wider uppercase text-muted-foreground mb-3">
           {t("seven_day", "7-Day Forecast")}
         </h3>
 
-        <div className="divide-y divide-border/60">
-          {w.daily.map((day, i) => {
-            const dObj = new Date(day.date + "T12:00:00");
-            const dayName = i === 0 ? t("today", "Today") : dObj.toLocaleDateString(i18n.language || undefined, { weekday: "short" });
+        <div className="divide-y divide-border/50">
+          {w.daily?.slice(0, 7).map((day, i) => {
+            const dateObj = new Date(day.date + "T12:00:00");
+            const dayName =
+              i === 0
+                ? t("today", "Today")
+                : dateObj.toLocaleDateString(i18n.language || undefined, { weekday: "short" });
 
             return (
-              <div key={day.date} className="flex items-center justify-between py-2.5 text-xs">
-                <span className="w-14 font-medium">{dayName}</span>
+              <div
+                key={day.date}
+                className="flex items-center justify-between py-2.5 text-xs first:pt-1 last:pb-1"
+              >
+                <span className="w-16 font-medium text-foreground">
+                  {dayName}
+                </span>
 
-                <div className="flex items-center gap-2 flex-1 px-2">
-                  <WeatherIcon wmoCode={day.code} isDay={1} className="h-5 w-5 shrink-0" />
-                  <span className="text-muted-foreground truncate">{getConditionLabel(day.code, t)}</span>
+                <div className="flex items-center gap-2">
+                  <WeatherIcon
+                    wmoCode={day.code}
+                    isDay={1}
+                    className="h-6 w-6 drop-shadow-xs"
+                  />
+                  <span className="text-[11px] text-muted-foreground hidden sm:inline w-24 truncate">
+                    {getConditionLabel(day.code, t)}
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 w-14 justify-center">
                   {day.precipProbMax > 0 && (
-                    <span className="text-[10px] font-medium text-blue-500 w-8 text-right">
-                      {day.precipProbMax}%
+                    <span className="text-[10px] font-medium text-sky-600 dark:text-sky-400">
+                      💧 {day.precipProbMax}%
                     </span>
                   )}
-                  <span className="font-bold w-7 text-right">{Math.round(day.max)}°</span>
-                  <span className="text-muted-foreground w-7 text-right">{Math.round(day.min)}°</span>
+                </div>
+
+                <div className="flex items-center gap-2 text-right">
+                  <span className="font-semibold text-foreground w-8">
+                    {Math.round(day.max)}°
+                  </span>
+                  <span className="text-muted-foreground w-8">
+                    {Math.round(day.min)}°
+                  </span>
                 </div>
               </div>
             );
           })}
         </div>
       </section>
-
-      {/* Attribution footer */}
-      <footer className="mt-6 text-center text-[11px] text-muted-foreground/70 pb-4">
-        {t("weather_by", "Weather data by Open-Meteo • Curated AI Watercolor Backgrounds")}
-      </footer>
     </>
   );
 }
