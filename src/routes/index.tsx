@@ -1,39 +1,37 @@
 // src/routes/index.tsx
-import { AppMenu } from "@/components/AppMenu";
-import { WeatherView } from "@/components/WeatherView";
-import { AiGalleryModal } from "@/components/AiGalleryModal";
+import { useState, useEffect, useRef } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import {
-  aqiCategory,
-  describe,
-  fetchWeather,
-  getClothingAdvice,
-  getWeatherAlert,
-  isFavorite,
-  isSamePlace,
-  loadCached,
-  loadFavorites,
-  loadUnitPref,
-  saveFavorites,
-  saveUnitPref,
-  searchCity,
-  skyKey,
-  uvCategory,
-  type Place,
-  type Weather,
-  type WeatherUnit,
-} from "@/lib/weather";
-import { LanguageSelector } from "@/components/LanguageSelector";
 import { useTranslation } from "react-i18next";
+import {
+  type Weather,
+  type Place,
+  type WeatherUnit,
+  searchCity,
+  getWeather,
+  loadUnitPref,
+  saveUnitPref,
+  loadFavorites,
+  saveFavorites,
+  isSamePlace,
+  isFavorite,
+} from "@/lib/weather";
+import { WeatherView, type TickerAlertItem } from "@/components/WeatherView";
+import { AppMenu } from "@/components/AppMenu";
+import { AiGalleryModal } from "@/components/AiGalleryModal";
 
 export const Route = createFileRoute("/")({
   head: () => ({
+    title: "My Weather Pal — Private, Art-Infused Forecasts",
     meta: [
-      { title: "My Weather Pal — Private local weather forecasts" },
-      { name: "description", content: "Current temperature, hourly and 7-day forecast. No tracking, works offline." },
-      { property: "og:title", content: "My Weather Pal — Private local weather forecasts" },
-      { property: "og:description", content: "Current temperature, hourly and 7-day forecast. No tracking, works offline." },
+      {
+        name: "description",
+        content: "Minimalist, account-free weather app featuring curated AI watercolor backgrounds and live meteorological advisories.",
+      },
+      { property: "og:title", content: "My Weather Pal — Private Weather" },
+      {
+        property: "og:description",
+        content: "Hyperlocal weather forecasts paired with custom AI watercolor art.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -41,142 +39,43 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const SKY_PREF_KEY = "weather:sky-pref";
-const SKY_OPTIONS = [
-  { value: "auto", label: "Auto (weather)" },
-  { value: "clear-day", label: "Sunny day" },
-  { value: "clear-night", label: "Clear night" },
-  { value: "cloudy-day", label: "Cloudy day" },
-  { value: "cloudy-night", label: "Cloudy night" },
-  { value: "fog", label: "Fog" },
-  { value: "rain", label: "Rain" },
-  { value: "snow", label: "Snow" },
-  { value: "storm", label: "Storm" },
-];
-
-const FONT_SIZE_KEY = "weather:font-size-pref";
-const FONT_SIZE_OPTIONS = [
-  { value: "normal", label: "Text: Normal (100%)", scale: "100%" },
-  { value: "large", label: "Text: Large (115%)", scale: "115%" },
-  { value: "xlarge", label: "Text: Huge (130%)", scale: "130%" },
-];
-
-export interface TickerAlertItem {
-  icon: string;
-  tag: string;
-  text: string;
-  severity: "disaster" | "warning" | "caution" | "clear";
-}
-
-const ONBOARDING_SLIDES = [
-  {
-    icon: "🔍",
-    title: "Your weather, anywhere",
-    text: "Search any city — Skopje, Tokyo, or your hometown.",
-  },
-  {
-    icon: "👕🌧️",
-    title: "More than temperature",
-    text: "What to wear, air quality, best time to go outside.",
-  },
-  {
-    icon: "⭐",
-    title: "Save favorites",
-    text: "Track multiple cities and get storm alerts.",
-  },
-];
-
-function OnboardingCarousel({ onFinish }: { onFinish: () => void }) {
-  const [index, setIndex] = useState(0);
-  const slide = ONBOARDING_SLIDES[index] ?? ONBOARDING_SLIDES[0]!;
-
-  function dismiss() {
-    try {
-      localStorage.setItem("hasSeenOnboarding", "true");
-    } catch {}
-    onFinish();
-  }
-
-  function handleNext() {
-    if (index < ONBOARDING_SLIDES.length - 1) {
-      setIndex(index + 1);
-    } else {
-      dismiss();
-    }
-  }
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Welcome walkthrough"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
-    >
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-2xl">
-        <div className="text-center">
-          <div className="mb-3 text-5xl" aria-hidden="true">
-            {slide.icon}
-          </div>
-          <h2 className="text-lg font-bold tracking-tight">{slide.title}</h2>
-          <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{slide.text}</p>
-        </div>
-
-        <div className="mt-6 flex justify-center gap-1.5" aria-hidden="true">
-          {ONBOARDING_SLIDES.map((_, i) => (
-            <span
-              key={i}
-              className={`h-1.5 rounded-full transition-all ${
-                i === index ? "w-6 bg-primary" : "w-1.5 bg-muted-foreground/30"
-              }`}
-            />
-          ))}
-        </div>
-
-        <div className="mt-6 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={dismiss}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground"
-          >
-            Skip
-          </button>
-          <button
-            type="button"
-            onClick={handleNext}
-            className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90"
-          >
-            {index < ONBOARDING_SLIDES.length - 1 ? "Next" : "Get started"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+const DEFAULT_PLACE: Place = {
+  name: "Ratchaburi",
+  country: "Thailand",
+  lat: 13.528,
+  lon: 99.813,
+};
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
-    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
       Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
-async function fetchNearbyEarthquakes(lat: number, lon: number): Promise<TickerAlertItem[]> {
+async function fetchLiveEarthquakes(lat: number, lon: number): Promise<TickerAlertItem[]> {
   try {
-    const url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson";
-    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    const res = await fetch(
+      "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson",
+      { signal: AbortSignal.timeout(4000) }
+    );
     if (!res.ok) return [];
     const data = await res.json();
     const items: TickerAlertItem[] = [];
-    const maxRadiusKm = 700;
+    const maxRadiusKm = 800;
 
     for (const feat of data.features ?? []) {
-      const [eqLon, eqLat] = feat.geometry?.coordinates ?? [];
-      if (eqLat == null || eqLon == null) continue;
+      const coords = feat.geometry?.coordinates;
+      if (!coords || coords.length < 2) continue;
+      const eqLon = coords[0];
+      const eqLat = coords[1];
       const dist = haversineKm(lat, lon, eqLat, eqLon);
       if (dist <= maxRadiusKm) {
         const mag = feat.properties?.mag ?? 0;
@@ -184,6 +83,7 @@ async function fetchNearbyEarthquakes(lat: number, lon: number): Promise<TickerA
         items.push({
           icon: "🌋",
           tag: "EARTHQUAKE ALERT",
+          tagKey: "alert_earthquake_tag",
           text: `M${mag.toFixed(1)} recorded ~${Math.round(dist)}km away (${place}).`,
           severity: mag >= 6.0 ? "disaster" : "warning",
         });
@@ -211,7 +111,9 @@ async function fetchLiveRiverFlood(lat: number, lon: number): Promise<TickerAler
           {
             icon: "🌊",
             tag: "RIVER FLOOD WATCH",
+            tagKey: "alert_flood_tag",
             text: `High river discharge detected (${Math.round(discharge)} m³/s). Basin water levels elevated.`,
+            textKey: "alert_flood_text",
             severity: ratio >= 1.0 ? "disaster" : "warning",
           },
         ];
@@ -286,31 +188,40 @@ function compileDisasterTicker(
     items.unshift({
       icon: "⚡",
       tag: "SEVERE THUNDERSTORM WARNING",
+      tagKey: "alert_thunderstorm_tag",
       text: "Active electrical storm and lightning detected in your immediate vicinity. Seek indoor shelter.",
+      textKey: "alert_thunderstorm_text",
       severity: "disaster",
     });
   } else if (code >= 71 && code <= 77) {
     items.unshift({
       icon: "❄️",
       tag: "WINTER WEATHER ADVISORY",
+      tagKey: "alert_winter_tag",
       text: "Freezing conditions with snowfall. Road surfaces may become hazardous.",
+      textKey: "alert_winter_text",
       severity: "warning",
     });
   } else if (code >= 61 && code <= 67) {
     items.unshift({
       icon: "🌧️",
       tag: "HEAVY PRECIPITATION ADVISORY",
+      tagKey: "alert_rain_tag",
       text: "Sustained rainfall expected. Localized urban water ponding possible.",
+      textKey: "alert_rain_text",
       severity: "warning",
     });
   }
 
   const nextRain = w.hourly.find((h) => h.precipProb >= 50);
-  if (nextRain && !items.some((i) => i.tag.includes("PRECIPITATION"))) {
+  if (nextRain && !items.some((i) => i.tag.includes("PRECIPITATION") || i.tagKey === "alert_rain_tag")) {
     items.push({
       icon: "💧",
       tag: "RAIN ONSET ADVISORY",
+      tagKey: "alert_rain_onset_tag",
       text: `Precipitation starting around ${nextRain.time.slice(11, 16)} (${nextRain.precipProb}% chance). Carry rain protection.`,
+      textKey: "alert_rain_onset_text",
+      textParams: { time: nextRain.time.slice(11, 16), prob: nextRain.precipProb },
       severity: "caution",
     });
   }
@@ -319,7 +230,9 @@ function compileDisasterTicker(
     items.push({
       icon: "🛡️",
       tag: "ALL CLEAR",
+      tagKey: "all_clear",
       text: "No active meteorological, seismic, or natural disaster emergencies reported for this area.",
+      textKey: "alert_all_clear_text",
       severity: "clear",
     });
   }
@@ -378,90 +291,84 @@ function Index() {
   const [results, setResults] = useState<Place[]>([]);
   const [searching, setSearching] = useState(false);
   const [showLocDialog, setShowLocDialog] = useState(false);
-  const [skyChoice, setSkyChoice] = useState("auto");
-  const [fontSizeChoice, setFontSizeChoice] = useState("normal");
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAiGallery, setShowAiGallery] = useState(false);
   const [activeCustomBg, setActiveCustomBg] = useState<string | null>(null);
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync active custom background for city
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setUnit(loadUnitPref());
+    setFavorites(loadFavorites());
+
+    const savedPlace = localStorage.getItem("weather:last-place");
+    let initialPlace = DEFAULT_PLACE;
+    if (savedPlace) {
+      try {
+        initialPlace = JSON.parse(savedPlace);
+      } catch {}
+    }
+    load(initialPlace, loadUnitPref());
+
+    const handleOnline = () => setOffline(false);
+    const handleOffline = () => setOffline(true);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
   useEffect(() => {
     if (!weather?.place?.name) return;
     try {
-      const saved = localStorage.getItem(`weather:custom-bg:${weather.place.name.toLowerCase().trim()}`);
-      setActiveCustomBg(saved || null);
+      const stored = localStorage.getItem(`weather:custom-bg:${weather.place.name.toLowerCase().trim()}`);
+      setActiveCustomBg(stored || null);
     } catch {
       setActiveCustomBg(null);
     }
   }, [weather?.place?.name]);
 
-  async function load(place: Place, targetUnit: WeatherUnit = unit, isRefresh = false) {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+  async function load(place: Place, u: WeatherUnit = unit) {
+    setLoading(true);
     setError(null);
-
-    Promise.allSettled([
-      fetchNearbyEarthquakes(place.lat, place.lon),
-      fetchLiveRiverFlood(place.lat, place.lon),
-      fetchLiveOfficialAlerts(place.lat, place.lon),
-    ]).then(([eqRes, floodRes, offRes]) => {
-      const eqItems = eqRes.status === "fulfilled" ? eqRes.value : [];
-      const floodItems = floodRes.status === "fulfilled" ? floodRes.value : [];
-      const offItems = offRes.status === "fulfilled" ? offRes.value : [];
-      setNearbyDisasters([...offItems, ...floodItems, ...eqItems]);
-    });
-
     try {
-      const data = await fetchWeather(place, targetUnit);
-      setWeather(data);
-      setOffline(false);
+      const w = await getWeather(place, u);
+      setWeather(w);
+      try {
+        localStorage.setItem("weather:last-place", JSON.stringify(place));
+      } catch {}
+
+      // Fetch disasters in parallel
+      Promise.all([
+        fetchLiveEarthquakes(place.lat, place.lon),
+        fetchLiveRiverFlood(place.lat, place.lon),
+        fetchLiveOfficialAlerts(place.lat, place.lon),
+      ]).then(([eq, flood, official]) => {
+        setNearbyDisasters([...official, ...flood, ...eq]);
+      });
     } catch {
-      setOffline(true);
-      setError("Couldn't reach the weather service. Showing last saved weather if available.");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
-
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem("hasSeenOnboarding")) {
-        setShowOnboarding(true);
-      }
-    } catch {}
-
-    try {
-      const savedSky = localStorage.getItem(SKY_PREF_KEY);
-      if (savedSky && SKY_OPTIONS.some((o) => o.value === savedSky)) {
-        setSkyChoice(savedSky);
-      }
-    } catch {}
-
-    try {
-      const savedFontSize = localStorage.getItem(FONT_SIZE_KEY);
-      if (savedFontSize && FONT_SIZE_OPTIONS.some((o) => o.value === savedFontSize)) {
-        setFontSizeChoice(savedFontSize);
-        const opt = FONT_SIZE_OPTIONS.find((o) => o.value === savedFontSize);
-        if (opt) document.documentElement.style.fontSize = opt.scale;
-      }
-    } catch {}
-
-    const savedUnit = loadUnitPref();
-    setUnit(savedUnit);
-    setFavorites(loadFavorites());
-
-    const cached = loadCached();
-    if (cached) {
-      setWeather(cached);
-      if (navigator.onLine) {
-        load(cached.place, savedUnit);
+      const cached = localStorage.getItem("weather:last");
+      if (cached) {
+        setWeather(JSON.parse(cached));
+        setError("Offline — showing cached weather");
       } else {
         setOffline(true);
       }
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }
+
+  async function refresh() {
+    if (!weather) return;
+    setRefreshing(true);
+    try {
+      await load(weather.place, unit);
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -558,229 +465,234 @@ function Index() {
         load({ name: placeName, country: countryName, lat, lon });
       },
       () => {
+        setError("Couldn't read location. Check browser permissions.");
         setLoading(false);
-        setError("Couldn't read your location. Check browser permissions.");
       },
-      { timeout: 10000 }
+      { timeout: 9000, maximumAge: 60000 }
     );
   }
 
-  const autoSky = weather ? skyKey(weather.current.code, weather.current.is_day) : "default";
-  const sky = skyChoice === "auto" ? autoSky : skyChoice;
-
-  useEffect(() => {
-    const isDarkSky = sky === "clear-night" || sky === "cloudy-night" || sky === "storm";
-    document.documentElement.classList.toggle("dark", isDarkSky);
-    return () => {
-      document.documentElement.classList.remove("dark");
-    };
-  }, [sky]);
-
   return (
-    <div className={`sky sky-${sky} min-h-screen text-foreground`}>
-      {showOnboarding && (
-        <OnboardingCarousel onFinish={() => setShowOnboarding(false)} />
-      )}
-      <main className="mx-auto max-w-2xl px-4 py-8">
-        {/* HEADER: Title + ✨ AI Gallery Button + Settings AppMenu */}
-        <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold tracking-tight">My Weather Pal</h1>
+    <div className="min-h-screen bg-background text-foreground transition-colors">
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🌦️</span>
+            <div>
+              <h1 className="text-base font-bold tracking-tight leading-tight">
+                My Weather Pal
+              </h1>
+              <p className="text-[10px] text-muted-foreground hidden sm:block">
+                Private • Accurate • Curated Art
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => setShowAiGallery(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 hover:bg-primary/20 px-3 py-1 text-xs font-semibold text-primary transition-all active:scale-95 shadow-xs cursor-pointer"
-              title="Open AI Background Gallery"
+              className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+              title="Open AI Watercolor Gallery"
             >
-              <span className="text-sm">✨</span>
+              <span>✨</span>
               <span>AI Gallery</span>
             </button>
           </div>
 
-          <AppMenu
-            unit={unit}
-            onUnitChange={toggleUnit}
-            skyChoice={skyChoice}
-            onSkyChange={(v) => {
-              setSkyChoice(v);
-              try {
-                if (v === "auto") localStorage.removeItem(SKY_PREF_KEY);
-                else localStorage.setItem(SKY_PREF_KEY, v);
-              } catch {}
-            }}
-            fontSizeChoice={fontSizeChoice}
-            onFontSizeChange={(v) => {
-              setFontSizeChoice(v);
-              const opt = FONT_SIZE_OPTIONS.find((o) => o.value === v);
-              if (opt) document.documentElement.style.fontSize = opt.scale;
-              try {
-                if (v === "normal") localStorage.removeItem(FONT_SIZE_KEY);
-                else localStorage.setItem(FONT_SIZE_KEY, v);
-              } catch {}
-            }}
-          />
-        </header>
-
-        {/* SEARCH BAR */}
-        <form onSubmit={onSearchSubmit} className="relative flex gap-2">
-          <div className="relative min-w-0 flex-1">
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t("search")}
-              aria-label={t("search")}
-              className="w-full rounded-lg border border-input bg-card px-3 py-2 text-card-foreground outline-none focus:ring-2 focus:ring-ring"
-            />
-            {searching && (
-              <span className="absolute right-3 top-2.5 text-xs text-muted-foreground">Searching…</span>
-            )}
-          </div>
-          <button className="rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground">Search</button>
-          <button
-            type="button"
-            onClick={() => setShowLocDialog(true)}
-            className="rounded-lg border border-input px-3 py-2"
-            aria-label="Use my location"
-            title="Use my location"
-          >
-            📍
-          </button>
-
-          {results.length > 0 && (
-            <ul className="absolute left-0 right-0 top-full z-40 mt-1 divide-y divide-border rounded-lg border border-border bg-card text-card-foreground shadow-lg">
-              {results.map((r) => (
-                <li key={`${r.lat},${r.lon}`}>
-                  <button
-                    type="button"
-                    className="w-full px-3 py-2 text-left hover:bg-accent focus:bg-accent outline-none"
-                    onClick={() => {
-                      setResults([]);
-                      setQ("");
-                      load(r);
-                    }}
-                  >
-                    {r.name} <span className="text-muted-foreground text-xs">{r.country}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </form>
-
-        {/* FAVORITES BAR */}
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-card/60 p-2.5">
-          <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
-            <span className="text-xs font-medium text-muted-foreground mr-1">{t("favorites")}:</span>
-            {favorites.length === 0 ? (
-              <span className="text-xs text-muted-foreground italic">{t("no_saved")}</span>
-            ) : (
-              favorites.map((fav) => (
-                <span
-                  key={`${fav.lat},${fav.lon}`}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs text-card-foreground shadow-xs hover:bg-accent cursor-pointer transition-colors"
-                  onClick={() => {
-                    setQ("");
-                    setResults([]);
-                    load(fav);
-                  }}
-                  title={`View weather for ${fav.name}`}
-                >
-                  <span className="font-medium">{fav.name}</span>
-                  <button
-                    type="button"
-                    onClick={(e) => removeFavorite(fav, e)}
-                    className="text-muted-foreground hover:text-foreground text-[10px]"
-                    aria-label={`Remove ${fav.name} from favorites`}
-                  >
-                    ✕
-                  </button>
-                </span>
-              ))
-            )}
+          <div className="flex items-center gap-2">
+            <AppMenu unit={unit} onUnitChange={toggleUnit} />
           </div>
         </div>
+      </header>
 
+      <main className="mx-auto max-w-3xl px-4 py-4 pb-12">
+        {/* Search Bar */}
+        <section className="relative mb-3">
+          <form onSubmit={onSearchSubmit} className="relative flex items-center">
+            <input
+              type="text"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={t("search", "Search a city...")}
+              className="w-full rounded-xl border border-input bg-card px-4 py-2.5 pl-10 pr-10 text-sm shadow-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <span className="absolute left-3.5 text-muted-foreground text-sm">
+              🔍
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowLocDialog(true)}
+              title="Use current location"
+              aria-label="Use current location"
+              className="absolute right-3 text-muted-foreground hover:text-foreground text-base transition-colors cursor-pointer"
+            >
+              📍
+            </button>
+          </form>
+
+          {/* Search Dropdown Results */}
+          {results.length > 0 && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-xl border border-border bg-popover p-1 shadow-lg">
+              {results.map((r, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setResults([]);
+                    setQ("");
+                    load(r);
+                  }}
+                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
+                >
+                  <span className="font-medium">
+                    {r.name}
+                    {r.country ? `, ${r.country}` : ""}
+                  </span>
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {r.lat.toFixed(2)}, {r.lon.toFixed(2)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Favorites Carousel */}
+        {favorites.length > 0 && (
+          <section className="mb-4">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider shrink-0 mr-1">
+                {t("favorites", "Favorites")}:
+              </span>
+              {favorites.map((fav, i) => {
+                const isSelected = weather && isSamePlace(fav, weather.place);
+                return (
+                  <div
+                    key={i}
+                    onClick={() => load(fav)}
+                    className={`group flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-all cursor-pointer shrink-0 border ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground border-primary font-medium shadow-xs"
+                        : "bg-card text-card-foreground border-border hover:bg-accent hover:text-accent-foreground"
+                    }`}
+                  >
+                    <span>{fav.name}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => removeFavorite(fav, e)}
+                      title="Remove favorite"
+                      className="opacity-60 hover:opacity-100 text-[10px] ml-0.5"
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Offline Banner */}
+        {offline && (
+          <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+            ⚠️ You are offline. Showing latest cached forecast.
+          </div>
+        )}
+
+        {/* Error Notice */}
         {error && (
-          <div className="mt-4 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+          <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
             {error}
           </div>
         )}
 
-        {/* MAIN WEATHER VIEW */}
-        {weather ? (
+        {/* Loading Spinner */}
+        {loading && !weather && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <p className="mt-3 text-xs text-muted-foreground">
+              Fetching weather data…
+            </p>
+          </div>
+        )}
+
+        {/* Main Weather View */}
+        {weather && (
           <WeatherView
             w={weather}
             disasters={compileDisasterTicker(weather, nearbyDisasters)}
             refreshing={refreshing}
             isFav={isFavorite(weather.place, favorites)}
             onToggleFav={() => toggleFavorite(weather.place)}
-            onRefresh={() => load(weather.place, unit, true)}
+            onRefresh={refresh}
             onOpenGallery={() => setShowAiGallery(true)}
             customBg={activeCustomBg}
           />
-        ) : loading ? (
-          <div className="mt-8 flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <span className="mt-3 text-xs">Loading weather data…</span>
-          </div>
-        ) : null}
-
-        {/* LOCATION PERMISSION DIALOG */}
-        {showLocDialog && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
-          >
-            <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-2xl">
-              <h3 className="text-base font-bold">Use your location?</h3>
-              <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-                Your coordinates are sent only to Open-Meteo for the forecast. No tracking or accounts.
-              </p>
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowLocDialog(false)}
-                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={useLocation}
-                  className="rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90"
-                >
-                  Allow location
-                </button>
-              </div>
-            </div>
-          </div>
         )}
 
-        {/* DEDICATED AI GALLERY MODAL */}
-        <AiGalleryModal
-          isOpen={showAiGallery}
-          onClose={() => setShowAiGallery(false)}
-          city={weather?.place.name || "Local Scenery"}
-          country={weather?.place.country}
-          weatherCode={weather?.current.code ?? 0}
-          weatherDesc={weather ? describe(weather.current.code).label : "Clear sky"}
-          activeBackground={activeCustomBg}
-          onSelectBackground={(newBg) => {
-            setActiveCustomBg(newBg);
-            const cityName = weather?.place.name || "default";
-            if (!newBg) {
-              try {
-                localStorage.removeItem(`weather:custom-bg:${cityName.toLowerCase().trim()}`);
-              } catch {}
-            } else {
-              try {
-                localStorage.setItem(`weather:custom-bg:${cityName.toLowerCase().trim()}`, newBg);
-              } catch {}
-            }
-          }}
-        />
+        {/* Footer */}
+        <footer className="mt-12 text-center text-xs text-muted-foreground border-t border-border/40 pt-6">
+          <p>{t("weather_by", "Weather data by Open-Meteo • Curated AI Watercolor Backgrounds")}</p>
+          <div className="mt-2 flex items-center justify-center gap-4">
+            <Link to="/privacy" className="hover:underline">
+              {t("privacy_policy", "Privacy Policy")}
+            </Link>
+          </div>
+        </footer>
       </main>
+
+      {/* AI Gallery Modal */}
+      <AiGalleryModal
+        open={showAiGallery}
+        onOpenChange={setShowAiGallery}
+        cityName={weather?.place.name || DEFAULT_PLACE.name}
+        country={weather?.place.country}
+        weatherCode={weather?.current.code}
+        weatherDesc={weather ? t("cond_clear", "Clear sky") : "Clear sky"}
+        activeBg={activeCustomBg}
+        onSelectBackground={(bg) => {
+          setActiveCustomBg(bg);
+          const cityKey = (weather?.place.name || DEFAULT_PLACE.name).toLowerCase().trim();
+          if (bg) {
+            try {
+              localStorage.setItem(`weather:custom-bg:${cityKey}`, bg);
+            } catch {}
+          } else {
+            try {
+              localStorage.removeItem(`weather:custom-bg:${cityKey}`);
+            } catch {}
+          }
+        }}
+      />
+
+      {/* Geolocation Permission Dialog */}
+      {showLocDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-xl text-card-foreground">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">📍</span>
+              <h3 className="font-bold text-sm">Use Your Current Location</h3>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              My Weather Pal will look up your coordinates directly in your browser without tracking or saving your location to any remote servers.
+            </p>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowLocDialog(false)}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-accent transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={useLocation}
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                Allow Location
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
