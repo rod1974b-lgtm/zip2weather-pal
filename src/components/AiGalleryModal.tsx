@@ -5,14 +5,19 @@ import {
   WEATHER_WATERCOLORS,
 } from "@/lib/aiWatercolorGenerator";
 
-interface AiGalleryModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  city: string;
+export interface AiGalleryModalProps {
+  // Supports both isOpen/open and onClose/onOpenChange naming
+  isOpen?: boolean;
+  open?: boolean;
+  onClose?: () => void;
+  onOpenChange?: (open: boolean) => void;
+  city?: string;
+  cityName?: string;
   country?: string;
   weatherCode?: number;
   weatherDesc?: string;
-  activeBackground: string | null;
+  activeBackground?: string | null;
+  activeBg?: string | null;
   onSelectBackground: (url: string | null) => void;
 }
 
@@ -83,14 +88,27 @@ function safeSetStorage(key: string, value: string): boolean {
 
 export function AiGalleryModal({
   isOpen,
+  open,
   onClose,
+  onOpenChange,
   city,
+  cityName,
   country,
   weatherCode = 0,
   weatherDesc = "Clear sky",
   activeBackground,
+  activeBg,
   onSelectBackground,
 }: AiGalleryModalProps) {
+  const isVisible = isOpen ?? open ?? false;
+  const handleClose = () => {
+    if (onClose) onClose();
+    if (onOpenChange) onOpenChange(false);
+  };
+
+  const targetCity = (cityName || city)?.trim() || "Local Scenery";
+  const activeImage = activeBg !== undefined ? activeBg : activeBackground;
+
   const [tab, setTab] = useState<"gallery" | "generate" | "saved">("gallery");
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -106,11 +124,9 @@ export function AiGalleryModal({
         setSavedGallery(JSON.parse(stored));
       }
     } catch {}
-  }, [isOpen]);
+  }, [isVisible]);
 
-  if (!isOpen) return null;
-
-  const targetCity = city?.trim() || "Local Scenery";
+  if (!isVisible) return null;
 
   // Retrieve curated artworks with all required parameters
   const cityArtworks = getAllAvailableArtworks(
@@ -125,7 +141,7 @@ export function AiGalleryModal({
 
   const handleSelect = (url: string | null) => {
     onSelectBackground(url);
-    onClose();
+    handleClose();
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
@@ -152,7 +168,6 @@ export function AiGalleryModal({
       }
 
       const rawUrl = data.imageUrl;
-      // Compress the 3MB raw image into lightweight ~90KB JPEG to stay well within browser quota
       const optimizedUrl = await compressImageForStorage(rawUrl, 1080, 0.82);
 
       // Save to city custom background
@@ -166,7 +181,7 @@ export function AiGalleryModal({
       } catch {}
 
       onSelectBackground(optimizedUrl);
-      onClose();
+      handleClose();
     } catch (err: any) {
       setErrorMsg(err?.message || "Failed to connect to AI Gateway.");
     } finally {
@@ -206,7 +221,7 @@ export function AiGalleryModal({
           safeSetStorage("weather:ai-gallery-history", JSON.stringify(nextHistory));
           setSavedGallery(nextHistory);
           onSelectBackground(dataUrl);
-          onClose();
+          handleClose();
         }
       };
       if (typeof event.target?.result === "string") {
@@ -242,7 +257,7 @@ export function AiGalleryModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
             aria-label="Close"
           >
@@ -323,7 +338,7 @@ export function AiGalleryModal({
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {cityArtworks.map((url, idx) => {
-                    const isActive = activeBackground === url;
+                    const isActive = activeImage === url;
                     return (
                       <div
                         key={idx}
@@ -362,7 +377,7 @@ export function AiGalleryModal({
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {weatherArtworks.slice(0, 8).map((url, idx) => {
-                    const isActive = activeBackground === url;
+                    const isActive = activeImage === url;
                     return (
                       <div
                         key={idx}
@@ -437,7 +452,7 @@ export function AiGalleryModal({
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {savedGallery.map((url, idx) => {
-                    const isActive = activeBackground === url;
+                    const isActive = activeImage === url;
                     return (
                       <div
                         key={idx}
@@ -500,7 +515,6 @@ export function AiGalleryModal({
                   />
                 </div>
 
-                {/* Inspiration chips */}
                 <div>
                   <span className="block text-[11px] text-slate-400 mb-1.5 font-medium">
                     Quick Scene Inspiration:
