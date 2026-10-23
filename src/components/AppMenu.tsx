@@ -9,21 +9,21 @@ const SKY_PREF_KEY = "weather:sky-pref";
 const FONT_SIZE_KEY = "weather:font-size-pref";
 
 const SKY_OPTIONS = [
-  { value: "auto", label: "Auto (weather)" },
-  { value: "clear-day", label: "Sunny day" },
-  { value: "clear-night", label: "Clear night" },
-  { value: "cloudy-day", label: "Cloudy day" },
-  { value: "cloudy-night", label: "Cloudy night" },
-  { value: "fog", label: "Fog" },
-  { value: "rain", label: "Rain" },
-  { value: "snow", label: "Snow" },
-  { value: "storm", label: "Storm" },
+  { value: "auto", labelKey: "sky_auto" },
+  { value: "clear-day", labelKey: "sky_clear_day" },
+  { value: "clear-night", labelKey: "sky_clear_night" },
+  { value: "cloudy-day", labelKey: "sky_cloudy_day" },
+  { value: "cloudy-night", labelKey: "sky_cloudy_night" },
+  { value: "fog", labelKey: "sky_fog" },
+  { value: "rain", labelKey: "sky_rain" },
+  { value: "snow", labelKey: "sky_snow" },
+  { value: "storm", labelKey: "sky_storm" },
 ];
 
 const FONT_SIZE_OPTIONS = [
-  { value: "normal", label: "Normal (100%)", scale: "100%" },
-  { value: "large", label: "Large (115%)", scale: "115%" },
-  { value: "xlarge", label: "Huge (130%)", scale: "130%" },
+  { value: "normal", labelKey: "font_normal", scale: "100%" },
+  { value: "large", labelKey: "font_large", scale: "115%" },
+  { value: "xlarge", labelKey: "font_xlarge", scale: "130%" },
 ];
 
 const LANGUAGES = [
@@ -39,240 +39,197 @@ const LANGUAGES = [
   { code: "ru", label: "Русский", flag: "🇷🇺" },
   { code: "ar", label: "العربية", flag: "🇸🇦" },
   { code: "ko", label: "한국어", flag: "🇰🇷" },
-  { code: "id", label: "Indonesia", flag: "🇮🇩" },
+  { code: "id", label: "Bahasa Indonesia", flag: "🇮🇩" },
   { code: "vi", label: "Tiếng Việt", flag: "🇻🇳" },
 ];
 
-interface AppMenuProps {
-  unit?: WeatherUnit;
-  onUnitChange?: (unit: WeatherUnit) => void;
-  skyChoice?: string;
-  onSkyChange?: (sky: string) => void;
-  fontSizeChoice?: string;
-  onFontSizeChange?: (size: string) => void;
-}
-
 export function AppMenu({
-  unit: propUnit,
+  unit,
   onUnitChange,
-  skyChoice: propSky,
-  onSkyChange,
-  fontSizeChoice: propFontSize,
-  onFontSizeChange,
-}: AppMenuProps = {}) {
+}: {
+  unit: WeatherUnit;
+  onUnitChange: (next: WeatherUnit) => void;
+}) {
   const { t, i18n } = useTranslation();
-  const [isOpen, setIsOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [skyPref, setSkyPref] = useState("auto");
+  const [fontSize, setFontSize] = useState("normal");
   const menuRef = useRef<HTMLDivElement>(null);
-
-  // Local fallback state
-  const [localUnit, setLocalUnit] = useState<WeatherUnit>("metric");
-  const [localSky, setLocalSky] = useState("auto");
-  const [localFont, setLocalFont] = useState("normal");
 
   useEffect(() => {
     try {
-      const savedUnit = loadUnitPref();
-      setLocalUnit(savedUnit);
       const savedSky = localStorage.getItem(SKY_PREF_KEY);
-      if (savedSky) setLocalSky(savedSky);
+      if (savedSky) setSkyPref(savedSky);
       const savedFont = localStorage.getItem(FONT_SIZE_KEY);
-      if (savedFont) setLocalFont(savedFont);
+      if (savedFont) setFontSize(savedFont);
     } catch {}
   }, []);
 
-  // Close when clicking outside or pressing Escape
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setIsOpen(false);
-    }
-
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("keydown", handleKeyDown);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen]);
-
-  const activeUnit = propUnit ?? localUnit;
-  const activeSky = propSky ?? localSky;
-  const activeFont = propFontSize ?? localFont;
-
-  function handleUnitToggle(nextUnit: WeatherUnit) {
-    setLocalUnit(nextUnit);
-    saveUnitPref(nextUnit);
-    window.dispatchEvent(new Event("weather:unit-change"));
-    onUnitChange?.(nextUnit);
-  }
-
-  function handleSkySelect(val: string) {
-    setLocalSky(val);
+  const handleSkyChange = (val: string) => {
+    setSkyPref(val);
     try {
-      if (val === "auto") localStorage.removeItem(SKY_PREF_KEY);
-      else localStorage.setItem(SKY_PREF_KEY, val);
-      window.dispatchEvent(new Event("weather:sky-change"));
+      localStorage.setItem(SKY_PREF_KEY, val);
+      window.dispatchEvent(new CustomEvent("weather:sky-change", { detail: val }));
     } catch {}
-    onSkyChange?.(val);
-  }
+  };
 
-  function handleFontSelect(val: string) {
-    setLocalFont(val);
-    const opt = FONT_SIZE_OPTIONS.find((o) => o.value === val);
-    if (opt) document.documentElement.style.fontSize = opt.scale;
+  const handleFontSizeChange = (val: string) => {
+    setFontSize(val);
     try {
-      if (val === "normal") localStorage.removeItem(FONT_SIZE_KEY);
-      else localStorage.setItem(FONT_SIZE_KEY, val);
+      localStorage.setItem(FONT_SIZE_KEY, val);
+      const opt = FONT_SIZE_OPTIONS.find((f) => f.value === val);
+      document.documentElement.style.fontSize = opt ? opt.scale : "100%";
     } catch {}
-    onFontSizeChange?.(val);
-  }
+  };
 
-  function handleLangSelect(code: string) {
+  const handleLangChange = (code: string) => {
     i18n.changeLanguage(code);
     try {
-      localStorage.setItem("app_language", code);
+      localStorage.setItem("weather:lang", code);
     } catch {}
-  }
+  };
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) {
+      document.addEventListener("mousedown", handleOutsideClick);
+    }
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [open]);
 
   return (
     <div className="relative inline-block text-left" ref={menuRef}>
       <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        aria-expanded={isOpen}
-        aria-haspopup="true"
-        aria-label={t("settings", "Settings")}
-        title={t("settings", "Settings")}
-        className="flex items-center gap-1.5 rounded-lg border border-input bg-card px-3 py-1.5 text-sm font-medium text-card-foreground shadow-xs hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+        onClick={() => setOpen(!open)}
+        className="flex items-center justify-center w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 shadow-md text-foreground transition-all duration-200"
+        aria-label={t("settings")}
       >
-        <span>⚙️</span>
-        <span>{t("settings", "Settings")}</span>
-        <span className="text-xs opacity-60">▾</span>
+        <span className="text-xl">⚙️</span>
       </button>
 
-      {/* Backdrop for touch screens */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[1px] sm:hidden"
-          onClick={() => setIsOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      {isOpen && (
-        <div
-          role="menu"
-          aria-orientation="vertical"
-          className="absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-[290px] sm:w-72 origin-top-right rounded-xl border border-border bg-card p-3 text-card-foreground shadow-2xl ring-1 ring-black/10 animate-in fade-in zoom-in-95 max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-border pb-2 mb-3">
-            <span className="font-semibold text-sm">{t("settings", "Settings")}</span>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted font-bold"
-              aria-label={t("close", "Close")}
-            >
-              ✕
-            </button>
+      {open && (
+        <div className="fixed sm:absolute right-4 sm:right-0 top-16 sm:top-12 w-[calc(100vw-32px)] sm:w-80 max-h-[85vh] overflow-y-auto z-50 rounded-2xl bg-card/95 backdrop-blur-xl border border-border shadow-2xl p-4 text-card-foreground">
+          {/* Units */}
+          <div className="mb-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              {t("units")}
+            </h4>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onUnitChange("metric");
+                  saveUnitPref("metric");
+                }}
+                className={`py-1.5 px-3 rounded-lg text-xs font-medium border text-center transition ${
+                  unit === "metric"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted hover:bg-muted/80 text-foreground border-border"
+                }`}
+              >
+                °C • Metric
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onUnitChange("us");
+                  saveUnitPref("us");
+                }}
+                className={`py-1.5 px-3 rounded-lg text-xs font-medium border text-center transition ${
+                  unit === "us"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted hover:bg-muted/80 text-foreground border-border"
+                }`}
+              >
+                °F • US
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-3 text-xs">
-            {/* Unit Preference */}
-            <div>
-              <label className="block font-medium mb-1 text-muted-foreground">{t("units", "Units")}</label>
-              <div className="grid grid-cols-2 gap-1 rounded-lg border border-input bg-muted/40 p-0.5">
+          {/* Sky Theme */}
+          <div className="mb-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              {t("sky_background")}
+            </h4>
+            <select
+              value={skyPref}
+              onChange={(e) => handleSkyChange(e.target.value)}
+              className="w-full bg-muted border border-border rounded-lg py-1.5 px-3 text-xs text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary"
+            >
+              {SKY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {t(opt.labelKey)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Font Size */}
+          <div className="mb-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              {t("text_size")}
+            </h4>
+            <div className="grid grid-cols-3 gap-1.5">
+              {FONT_SIZE_OPTIONS.map((f) => (
                 <button
+                  key={f.value}
                   type="button"
-                  onClick={() => handleUnitToggle("imperial")}
-                  className={`rounded-md py-1 font-medium transition-colors ${
-                    activeUnit === "imperial"
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
+                  onClick={() => handleFontSizeChange(f.value)}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-medium border text-center transition ${
+                    fontSize === f.value
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted hover:bg-muted/80 text-foreground border-border"
                   }`}
                 >
-                  US (°F, mph)
+                  {t(f.labelKey)}
                 </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Language Selector */}
+          <div className="mb-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              {t("language")}
+            </h4>
+            <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
+              {LANGUAGES.map((lang) => (
                 <button
+                  key={lang.code}
                   type="button"
-                  onClick={() => handleUnitToggle("metric")}
-                  className={`rounded-md py-1 font-medium transition-colors ${
-                    activeUnit === "metric"
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
+                  onClick={() => handleLangChange(lang.code)}
+                  className={`flex items-center gap-1.5 py-1.5 px-2 rounded-lg text-xs text-left border transition ${
+                    i18n.language === lang.code
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted hover:bg-muted/80 text-foreground border-border"
                   }`}
                 >
-                  Metric (°C, km/h)
+                  <span>{lang.flag}</span>
+                  <span className="truncate">{lang.label}</span>
                 </button>
-              </div>
+              ))}
             </div>
+          </div>
 
-            {/* Language */}
-            <div>
-              <label className="block font-medium mb-1 text-muted-foreground">{t("language", "Language")}</label>
-              <select
-                value={i18n.language || "en"}
-                onChange={(e) => handleLangSelect(e.target.value)}
-                className="w-full rounded-lg border border-input bg-card px-2.5 py-1.5 text-xs text-card-foreground outline-none focus:ring-2 focus:ring-ring"
-              >
-                {LANGUAGES.map((l) => (
-                  <option key={l.code} value={l.code}>
-                    {l.flag} {l.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Text Size */}
-            <div>
-              <label className="block font-medium mb-1 text-muted-foreground">{t("text_size", "Text size")}</label>
-              <select
-                value={activeFont}
-                onChange={(e) => handleFontSelect(e.target.value)}
-                className="w-full rounded-lg border border-input bg-card px-2.5 py-1.5 text-xs text-card-foreground outline-none focus:ring-2 focus:ring-ring"
-              >
-                {FONT_SIZE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Sky Background */}
-            <div>
-              <label className="block font-medium mb-1 text-muted-foreground">{t("sky_background", "Sky background")}</label>
-              <select
-                value={activeSky}
-                onChange={(e) => handleSkySelect(e.target.value)}
-                className="w-full rounded-lg border border-input bg-card px-2.5 py-1.5 text-xs text-card-foreground outline-none focus:ring-2 focus:ring-ring"
-              >
-                {SKY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Privacy Policy Link */}
-            <div className="border-t border-border pt-2">
-              <Link
-                to="/privacy"
-                onClick={() => setIsOpen(false)}
-                className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-input px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              >
-                <span>🛡️</span>
-                <span>{t("privacy_policy", "Privacy Policy")}</span>
-              </Link>
-            </div>
+          <div className="border-t border-border pt-3 flex items-center justify-between text-xs text-muted-foreground">
+            <Link
+              to="/privacy"
+              onClick={() => setOpen(false)}
+              className="hover:text-foreground underline underline-offset-2"
+            >
+              {t("privacy_policy")}
+            </Link>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="px-3 py-1 rounded bg-muted hover:bg-muted/80 text-foreground font-medium"
+            >
+              {t("close")}
+            </button>
           </div>
         </div>
       )}
