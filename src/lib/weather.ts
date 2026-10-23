@@ -184,6 +184,9 @@ export async function fetchWeather(place: Place, unit: WeatherUnit = "metric"): 
   return w;
 }
 
+// Alias export for backwards compatibility
+export const getWeather = fetchWeather;
+
 export function describe(code: number): { label: string; icon: string } {
   if (code === 0) return { label: "Clear", icon: "☀️" };
   if (code <= 2) return { label: "Partly cloudy", icon: "⛅" };
