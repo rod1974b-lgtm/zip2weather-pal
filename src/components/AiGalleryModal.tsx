@@ -1,563 +1,296 @@
 // src/components/AiGalleryModal.tsx
-import { useState, useEffect, useRef } from "react";
-import {
-  getAllAvailableArtworks,
-  WEATHER_WATERCOLORS,
-} from "@/lib/aiWatercolorGenerator";
+import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { getAllAvailableArtworks } from "@/lib/aiWatercolorGenerator";
 
-export interface AiGalleryModalProps {
-  // Supports both isOpen/open and onClose/onOpenChange naming
+interface AiGalleryModalProps {
   isOpen?: boolean;
   open?: boolean;
   onClose?: () => void;
   onOpenChange?: (open: boolean) => void;
   city?: string;
   cityName?: string;
-  country?: string;
-  weatherCode?: number;
-  weatherDesc?: string;
-  activeBackground?: string | null;
-  activeBg?: string | null;
-  onSelectBackground: (url: string | null) => void;
+  activeBackground?: string;
+  activeBg?: string;
+  onSelectBackground: (url: string) => void;
 }
 
-const PRESET_IDEAS = [
-  "Golden sunset glow with warm reflections",
-  "Moody mist rolling over the historic bridge",
-  "Peaceful morning canals with wooden boats",
-  "Rain-soaked streets with neon reflections",
-  "Cherry blossoms in soft atmospheric breeze",
-  "Dramatic lightning over mountain peaks",
-];
+const STORAGE_SAVED_KEY = "weather:custom-art-saved";
 
-// Compresses high-res 3MB AI images down to ~90KB so they fit comfortably in browser storage
-function compressImageForStorage(dataUrl: string, maxDim = 1080, quality = 0.82): Promise<string> {
-  return new Promise((resolve) => {
-    if (!dataUrl.startsWith("data:")) return resolve(dataUrl);
-
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height && width > maxDim) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
-        } else if (height > maxDim) {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return resolve(dataUrl);
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      } catch {
-        resolve(dataUrl);
-      }
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
-}
-
-function safeSetStorage(key: string, value: string): boolean {
-  try {
-    localStorage.setItem(key, value);
-    return true;
-  } catch {
-    try {
-      const historyRaw = localStorage.getItem("weather:ai-gallery-history");
-      if (historyRaw) {
-        const history: string[] = JSON.parse(historyRaw);
-        if (history.length > 2) {
-          localStorage.setItem("weather:ai-gallery-history", JSON.stringify(history.slice(0, 3)));
-          localStorage.setItem(key, value);
-          return true;
-        }
-      }
-    } catch {}
-    return false;
-  }
-}
-
-export function AiGalleryModal({
-  isOpen,
-  open,
-  onClose,
-  onOpenChange,
-  city,
-  cityName,
-  country,
-  weatherCode = 0,
-  weatherDesc = "Clear sky",
-  activeBackground,
-  activeBg,
-  onSelectBackground,
-}: AiGalleryModalProps) {
-  const isVisible = isOpen ?? open ?? false;
+export function AiGalleryModal(props: AiGalleryModalProps) {
+  const { t } = useTranslation();
+  const isOpen = props.isOpen ?? props.open ?? false;
   const handleClose = () => {
-    if (onClose) onClose();
-    if (onOpenChange) onOpenChange(false);
+    props.onClose?.();
+    props.onOpenChange?.(false);
+  };
+  const activeCity = props.city || props.cityName || "Current City";
+  const activeBackground = props.activeBackground || props.activeBg || "";
+
+  const [activeTab, setActiveTab] = useState<"curated" | "saved" | "generate">("curated");
+  const [curatedList, setCuratedList] = useState<any[]>([]);
+  const [savedArts, setSavedArts] = useState<{ id: string; url: string; label: string }[]>([]);
+  const [prompt, setPrompt] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        const list = getAllAvailableArtworks(activeCity);
+        setCuratedList(list);
+      } catch {
+        setCuratedList([]);
+      }
+      try {
+        const raw = localStorage.getItem(STORAGE_SAVED_KEY);
+        if (raw) setSavedArts(JSON.parse(raw));
+      } catch {
+        setSavedArts([]);
+      }
+    }
+  }, [isOpen, activeCity]);
+
+  if (!isOpen) return null;
+
+  const handleSelect = (url: string) => {
+    props.onSelectBackground(url);
+    handleClose();
   };
 
-  const targetCity = (cityName || city)?.trim() || "Local Scenery";
-  const activeImage = activeBg !== undefined ? activeBg : activeBackground;
-
-  const [tab, setTab] = useState<"gallery" | "generate" | "saved">("gallery");
-  const [prompt, setPrompt] = useState("");
-  const [generating, setGenerating] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [savedGallery, setSavedGallery] = useState<string[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Load saved AI backgrounds from localStorage history
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("weather:ai-gallery-history");
-      if (stored) {
-        setSavedGallery(JSON.parse(stored));
-      }
-    } catch {}
-  }, [isVisible]);
-
-  if (!isVisible) return null;
-
-  // Retrieve curated artworks with all required parameters
-  const cityArtworks = getAllAvailableArtworks(
-    targetCity,
-    weatherCode,
-    typeof weatherDesc === "string" ? weatherDesc : "Clear sky",
-    country
-  );
-
-  // Atmospheric weather backgrounds flattened across all conditions
-  const weatherArtworks = Object.values(WEATHER_WATERCOLORS).flat();
-
-  const handleSelect = (url: string | null) => {
-    onSelectBackground(url);
-    handleClose();
+  const handleClearSaved = () => {
+    localStorage.removeItem(STORAGE_SAVED_KEY);
+    setSavedArts([]);
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetCity || !prompt.trim() || generating) return;
-
-    setGenerating(true);
-    setErrorMsg(null);
+    if (!prompt.trim() || isGenerating) return;
+    setIsGenerating(true);
 
     try {
       const res = await fetch("/api/generate-watercolor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          city: targetCity,
-          userPrompt: prompt.trim(),
-          weatherDesc,
+          city: activeCity,
+          prompt: prompt.trim(),
         }),
       });
 
+      if (!res.ok) throw new Error("Generation failed");
       const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Failed to generate image");
+      if (data?.imageUrl) {
+        const newArt = {
+          id: Date.now().toString(),
+          url: data.imageUrl,
+          label: `${activeCity} - ${prompt.trim()}`,
+        };
+        const updated = [newArt, ...savedArts.slice(0, 9)];
+        setSavedArts(updated);
+        try {
+          localStorage.setItem(STORAGE_SAVED_KEY, JSON.stringify(updated));
+        } catch {}
+        props.onSelectBackground(data.imageUrl);
+        handleClose();
       }
-
-      const rawUrl = data.imageUrl;
-      const optimizedUrl = await compressImageForStorage(rawUrl, 1080, 0.82);
-
-      // Save to city custom background
-      safeSetStorage(`weather:custom-bg:${targetCity.toLowerCase().trim()}`, optimizedUrl);
-
-      // Add to persistent AI Gallery history
-      try {
-        const nextHistory = [optimizedUrl, ...savedGallery.filter((u) => u !== optimizedUrl)].slice(0, 16);
-        safeSetStorage("weather:ai-gallery-history", JSON.stringify(nextHistory));
-        setSavedGallery(nextHistory);
-      } catch {}
-
-      onSelectBackground(optimizedUrl);
-      handleClose();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to connect to AI Gateway.");
+    } catch (err) {
+      console.error(err);
     } finally {
-      setGenerating(false);
+      setIsGenerating(false);
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const maxDim = 1200;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height && width > maxDim) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
-        } else if (height > maxDim) {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
-          safeSetStorage(`weather:custom-bg:${targetCity.toLowerCase().trim()}`, dataUrl);
-          const nextHistory = [dataUrl, ...savedGallery.filter((u) => u !== dataUrl)].slice(0, 16);
-          safeSetStorage("weather:ai-gallery-history", JSON.stringify(nextHistory));
-          setSavedGallery(nextHistory);
-          onSelectBackground(dataUrl);
-          handleClose();
-        }
-      };
-      if (typeof event.target?.result === "string") {
-        img.src = event.target.result;
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative flex flex-col max-h-[90vh] w-full max-w-2xl rounded-2xl border border-white/20 bg-slate-900/95 text-white shadow-2xl backdrop-blur-xl overflow-hidden">
-        {/* Hidden photo file input */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileUpload}
-          className="hidden"
-          aria-hidden="true"
-        />
-
-        {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl">✨</span>
-            <div>
-              <h2 className="text-lg font-bold tracking-tight">AI Background Gallery</h2>
-              <p className="text-xs text-slate-400">
-                Custom scenery for <span className="text-white font-medium">{targetCity}</span>
-              </p>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+      <div className="w-full max-w-xl max-h-[90vh] flex flex-col rounded-2xl bg-card border border-border shadow-2xl text-card-foreground overflow-hidden">
+        {/* Header */}
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🎨</span>
+            <h3 className="font-bold text-base">{t("gallery_title")}</h3>
           </div>
           <button
-            type="button"
             onClick={handleClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-            aria-label="Close"
+            className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
           >
             ✕
           </button>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-white/10 px-6 py-2.5 bg-black/20 text-xs">
+        {/* Tabs */}
+        <div className="flex border-b border-border bg-muted/40 px-4 gap-2 pt-2 text-xs font-medium">
           <button
-            type="button"
-            onClick={() => setTab("gallery")}
-            className={`rounded-lg px-3 py-1.5 font-medium transition-all cursor-pointer ${
-              tab === "gallery"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "text-slate-300 hover:bg-white/10 hover:text-white"
+            onClick={() => setActiveTab("curated")}
+            className={`pb-2 px-3 border-b-2 transition ${
+              activeTab === "curated"
+                ? "border-primary text-primary font-bold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            🖼️ City Artworks ({cityArtworks.length})
+            {t("tab_curated")}
           </button>
           <button
-            type="button"
-            onClick={() => setTab("saved")}
-            className={`rounded-lg px-3 py-1.5 font-medium transition-all cursor-pointer ${
-              tab === "saved"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "text-slate-300 hover:bg-white/10 hover:text-white"
+            onClick={() => setActiveTab("saved")}
+            className={`pb-2 px-3 border-b-2 transition ${
+              activeTab === "saved"
+                ? "border-primary text-primary font-bold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            ⭐ Saved & Created ({savedGallery.length})
+            {t("tab_saved")} ({savedArts.length})
           </button>
           <button
-            type="button"
-            onClick={() => setTab("generate")}
-            className={`rounded-lg px-3 py-1.5 font-medium transition-all cursor-pointer ${
-              tab === "generate"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "text-slate-300 hover:bg-white/10 hover:text-white"
+            onClick={() => setActiveTab("generate")}
+            className={`pb-2 px-3 border-b-2 transition ${
+              activeTab === "generate"
+                ? "border-primary text-primary font-bold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            ✨ Generate with AI
+            {t("tab_generate")}
           </button>
         </div>
 
-        {/* Tab Body */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {tab === "gallery" && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-200">
-                    Artworks for {targetCity}
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Tap any image to set as your live hero card background
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSelect(null)}
-                    className="rounded-lg border border-white/20 bg-white/5 px-2.5 py-1 text-xs text-slate-300 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                  >
-                    🔄 Auto Weather
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="rounded-lg border border-white/20 bg-white/5 px-2.5 py-1 text-xs text-slate-300 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                  >
-                    📷 Upload Photo
-                  </button>
-                </div>
-              </div>
-
-              {cityArtworks.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4">No curated local landmarks yet. Check out the atmospheric presets below or generate a custom scene!</p>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {cityArtworks.map((url, idx) => {
-                    const isActive = activeImage === url;
-                    return (
-                      <div
-                        key={idx}
-                        onClick={() => handleSelect(url)}
-                        className={`group relative aspect-16/10 cursor-pointer overflow-hidden rounded-xl border transition-all ${
-                          isActive
-                            ? "border-primary ring-2 ring-primary shadow-lg scale-[1.02]"
-                            : "border-white/15 hover:border-white/40 hover:scale-[1.01]"
-                        }`}
-                      >
-                        <img
-                          src={url}
-                          alt={`${targetCity} landmark ${idx + 1}`}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          loading="lazy"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80 group-hover:opacity-100 transition-opacity" />
-                        {isActive && (
-                          <div className="absolute top-2 right-2 rounded-full bg-primary p-1 text-[10px] text-white shadow-sm">
-                            ✓ Active
-                          </div>
-                        )}
-                        <div className="absolute bottom-2 left-2 right-2 text-[11px] font-medium text-white truncate">
-                          {targetCity} Art #{idx + 1}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Atmospheric Weather Presets */}
-              <div className="pt-4 border-t border-white/10">
-                <h4 className="text-xs font-semibold text-slate-300 mb-2">
-                  Atmospheric Weather Artworks
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {weatherArtworks.slice(0, 8).map((url, idx) => {
-                    const isActive = activeImage === url;
-                    return (
-                      <div
-                        key={idx}
-                        onClick={() => handleSelect(url)}
-                        className={`group relative aspect-16/10 cursor-pointer overflow-hidden rounded-lg border transition-all ${
-                          isActive
-                            ? "border-primary ring-2 ring-primary"
-                            : "border-white/10 hover:border-white/30"
-                        }`}
-                      >
-                        <img
-                          src={url}
-                          alt={`Atmosphere ${idx + 1}`}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          loading="lazy"
-                        />
-                        {isActive && (
-                          <div className="absolute top-1.5 right-1.5 rounded-full bg-primary px-1 text-[9px] text-white">
-                            ✓
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {tab === "saved" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-200">
-                    Saved & Custom AI Backgrounds
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    History of scenes generated or uploaded across all your searches
-                  </p>
-                </div>
-                {savedGallery.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        localStorage.removeItem("weather:ai-gallery-history");
-                        setSavedGallery([]);
-                      } catch {}
-                    }}
-                    className="text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer"
-                  >
-                    Clear History
-                  </button>
-                )}
-              </div>
-
-              {savedGallery.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <span className="text-4xl mb-2 opacity-50">🖼️</span>
-                  <p className="text-sm text-slate-300 font-medium">No saved backgrounds yet</p>
-                  <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                    Generate custom watercolor scenes using the AI generator tab or upload your own photos.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setTab("generate")}
-                    className="mt-4 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
-                  >
-                    ✨ Generate First Scene
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {savedGallery.map((url, idx) => {
-                    const isActive = activeImage === url;
-                    return (
-                      <div
-                        key={idx}
-                        onClick={() => handleSelect(url)}
-                        className={`group relative aspect-16/10 cursor-pointer overflow-hidden rounded-xl border transition-all ${
-                          isActive
-                            ? "border-primary ring-2 ring-primary shadow-lg scale-[1.02]"
-                            : "border-white/15 hover:border-white/40"
-                        }`}
-                      >
-                        <img
-                          src={url}
-                          alt={`Saved art ${idx + 1}`}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          loading="lazy"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80" />
-                        {isActive && (
-                          <div className="absolute top-2 right-2 rounded-full bg-primary p-1 text-[10px] text-white shadow-sm">
-                            ✓ Active
-                          </div>
-                        )}
-                        <div className="absolute bottom-2 left-2 text-[11px] font-medium text-white truncate">
-                          Saved Creation #{idx + 1}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {tab === "generate" && (
-            <div className="max-w-lg mx-auto py-2">
-              <form onSubmit={handleGenerate} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Target City
-                  </label>
-                  <input
-                    type="text"
-                    value={targetCity}
-                    disabled
-                    className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/80 cursor-not-allowed"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Describe Your Desired Scene
-                  </label>
-                  <textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="e.g. Traditional riverside temple at golden hour with soft misty water reflections..."
-                    rows={3}
-                    className="w-full rounded-lg border border-white/15 bg-white/5 p-3 text-sm text-white placeholder-slate-500 focus:border-primary focus:outline-hidden resize-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <span className="block text-[11px] text-slate-400 mb-1.5 font-medium">
-                    Quick Scene Inspiration:
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {PRESET_IDEAS.map((idea, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setPrompt(idea)}
-                        className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-slate-300 hover:border-primary/50 hover:bg-primary/20 hover:text-white transition-all text-left cursor-pointer"
-                      >
-                        {idea}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {errorMsg && (
-                  <div className="rounded-lg bg-red-500/20 border border-red-500/40 p-2.5 text-xs text-red-200">
-                    {errorMsg}
-                  </div>
-                )}
-
+        {/* Content Body */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {activeTab === "curated" && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs text-muted-foreground">
+                  {curatedList.length} artworks for {activeCity}
+                </span>
                 <button
-                  type="submit"
-                  disabled={generating || !prompt.trim()}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 font-semibold text-sm text-primary-foreground shadow-md transition-all hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
+                  onClick={() => handleSelect("")}
+                  className="text-xs font-medium text-primary hover:underline"
                 >
-                  {generating ? (
-                    <>
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      <span>Creating Watercolor Scene...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>✨</span>
-                      <span>Generate & Set Background</span>
-                    </>
-                  )}
+                  {t("gallery_reset_art")}
                 </button>
-              </form>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {curatedList.map((art, idx) => {
+                  const isCurActive = activeBackground === art.url;
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => handleSelect(art.url)}
+                      className={`group relative rounded-xl overflow-hidden border cursor-pointer aspect-video transition-all ${
+                        isCurActive
+                          ? "border-primary ring-2 ring-primary/40 shadow-md"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <img
+                        src={art.url}
+                        alt={art.title || "Art"}
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-80" />
+                      <span className="absolute bottom-2 left-2 right-2 text-[11px] font-semibold text-white truncate">
+                        {art.title || activeCity}
+                      </span>
+                      {isCurActive && (
+                        <span className="absolute top-2 right-2 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded font-bold shadow">
+                          {t("gallery_active_badge")}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
+          )}
+
+          {activeTab === "saved" && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs text-muted-foreground">
+                  {savedArts.length} saved
+                </span>
+                {savedArts.length > 0 && (
+                  <button
+                    onClick={handleClearSaved}
+                    className="text-xs text-destructive hover:underline"
+                  >
+                    {t("gallery_clear_saved")}
+                  </button>
+                )}
+              </div>
+              {savedArts.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground text-xs">
+                  {t("gallery_empty_saved")}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {savedArts.map((art) => (
+                    <div
+                      key={art.id}
+                      onClick={() => handleSelect(art.url)}
+                      className="group relative rounded-xl overflow-hidden border border-border cursor-pointer aspect-video"
+                    >
+                      <img
+                        src={art.url}
+                        alt={art.label}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                      <span className="absolute bottom-2 left-2 right-2 text-[11px] font-semibold text-white truncate">
+                        {art.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "generate" && (
+            <form onSubmit={handleGenerate} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-foreground">
+                  {t("gallery_prompt_label")} ({activeCity})
+                </label>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder={t("gallery_prompt_placeholder")}
+                  rows={3}
+                  className="w-full bg-muted border border-border rounded-xl p-3 text-xs text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <span className="text-[11px] font-medium text-muted-foreground block mb-2">
+                  {t("gallery_preset_inspiration")}
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    "golden temple reflecting in morning rain",
+                    "misty old town market under soft clouds",
+                    "vibrant sunset skyline in watercolor",
+                    "snowy mountain pass with dramatic clouds",
+                  ].map((idea) => (
+                    <button
+                      key={idea}
+                      type="button"
+                      onClick={() => setPrompt(idea)}
+                      className="text-[11px] bg-muted hover:bg-muted/80 text-foreground px-2.5 py-1 rounded-full border border-border"
+                    >
+                      {idea}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={!prompt.trim() || isGenerating}
+                className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs transition disabled:opacity-50"
+              >
+                {isGenerating
+                  ? t("gallery_btn_generating")
+                  : t("gallery_btn_generate")}
+              </button>
+            </form>
           )}
         </div>
       </div>
