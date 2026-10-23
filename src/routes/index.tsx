@@ -156,7 +156,8 @@ async function fetchLiveOfficialAlerts(lat: number, lon: number): Promise<Ticker
   // TMD Thailand alerts
   if (lat >= 5.5 && lat <= 20.5 && lon >= 97 && lon <= 106) {
     try {
-      const res = await fetch("https://data.tmd.go.th/api/WeatherWarningNews/v1/?uid=api&ukey=api12345&format=json", {
+      const url = "https://data.tmd.go.th/api/WeatherWarningNews/v1/?uid=api&ukey=api12345&format=json";
+      const res = await fetch(url, {
         signal: AbortSignal.timeout(3500),
       });
       if (res.ok) {
@@ -490,7 +491,7 @@ function Index() {
               type="button"
               onClick={() => setShowAiGallery(true)}
               className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/20 transition-colors cursor-pointer"
-              title="Open AI Watercolor Gallery"
+              title={t("gallery_title", "Open AI Watercolor Gallery")}
             >
               <span>✨</span>
               <span>AI Gallery</span>
@@ -520,8 +521,8 @@ function Index() {
             <button
               type="button"
               onClick={() => setShowLocDialog(true)}
-              title="Use current location"
-              aria-label="Use current location"
+              title={t("loc_dialog_title", "Use current location")}
+              aria-label={t("loc_dialog_title", "Use current location")}
               className="absolute right-3 text-muted-foreground hover:text-foreground text-base transition-colors cursor-pointer"
             >
               📍
@@ -669,10 +670,10 @@ function Index() {
           <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-xl text-card-foreground">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xl">📍</span>
-              <h3 className="font-bold text-sm">Use Your Current Location</h3>
+              <h3 className="font-bold text-sm">{t("loc_dialog_title", "Use Your Current Location")}</h3>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              My Weather Pal will look up your coordinates directly in your browser without tracking or saving your location to any remote servers.
+              {t("loc_dialog_desc", "My Weather Pal will look up your coordinates directly in your browser without tracking or saving your location to any remote servers.")}
             </p>
             <div className="mt-4 flex items-center justify-end gap-2">
               <button
@@ -680,14 +681,14 @@ function Index() {
                 onClick={() => setShowLocDialog(false)}
                 className="rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-accent transition-colors cursor-pointer"
               >
-                Cancel
+                {t("loc_dialog_cancel", "Cancel")}
               </button>
               <button
                 type="button"
                 onClick={useLocation}
                 className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer"
               >
-                Allow Location
+                {t("loc_dialog_allow", "Allow Location")}
               </button>
             </div>
           </div>
