@@ -149,16 +149,17 @@ export function WeatherView({
 
     getCityWeatherBackground(
       w.place.name,
-      w.current.code,
       currentInfo.desc || "Clear",
-      w.place.country,
+      w.current.code,
       w.current.temp,
-      w.unit,
       (streamingBg) => {
         if (!cancelled && streamingBg) {
           setHeroBg(streamingBg);
         }
-      }
+      },
+      w.place.country,
+      w.place.lat,
+      w.place.lon
     )
       .then((art) => {
         if (!cancelled && art) {
@@ -183,42 +184,37 @@ export function WeatherView({
   const tailoredAdvice = (() => {
     if (wearStyle === "business") {
       if (isFreezing) return t("wear_biz_freezing", "Wool overcoat, tailored trousers, cashmere knit & warm thermal layers.");
-      if (isRainy) return t("wear_biz_rain", "Trench coat or water-repellent blazer, dress leather shoes & compact umbrella.");
-      if (isWarm) return t("wear_biz_warm", "Lightweight linen or breathable cotton suit, open collar, loafers.");
-      return t("wear_biz_mild", "Structured blazer, pressed chinos or tailored trousers, breathable layer.");
+      if (isRainy) return t("wear_biz_rain", "Waterproof trench coat, dark leather shoes, tailored suit & compact umbrella.");
+      if (isWarm) return t("wear_biz_warm", "Lightweight linen or breathable cotton shirt, neat chinos & loafers.");
+      return t("wear_biz_mild", "Structured blazer, Oxford button-down shirt & smart pressed trousers.");
     }
     if (wearStyle === "sport") {
-      if (isFreezing) return t("wear_sport_freezing", "Thermal base layers, windbreaker, running gloves & fleece beanie.");
-      if (isRainy) return t("wear_sport_rain", "Waterproof running shell, moisture-wicking gear & high-traction shoes.");
-      if (isWarm) return t("wear_sport_warm", "Ultralight singlet or tee, athletic shorts, cap & sun protection.");
-      return t("wear_sport_mild", "Moisture-wicking athletic pullover, training joggers & performance sneakers.");
+      if (isFreezing) return t("wear_sport_freezing", "Thermal compression base layer, windproof running jacket & fleece gloves.");
+      if (isRainy) return t("wear_sport_rain", "Water-repellent hooded shell, synthetic moisture-wicking tights & trail runners.");
+      if (isWarm) return t("wear_sport_warm", "Ultralight singlet or tank, breathable running shorts & UV protection cap.");
+      return t("wear_sport_mild", "Breathable tech tee, flexible joggers & cushioned running shoes.");
     }
-    // Casual
-    if (isFreezing) return t("wear_cas_freezing", "Heavy winter jacket, cozy hoodie, warm knit scarf & insulated boots.");
-    if (isRainy) return t("wear_cas_rain", "Rain jacket or hooded layer, waterproof footwear & a sturdy umbrella.");
-    if (isWarm) return t("wear_cas_warm", "Breathable cotton tee, light shorts or relaxed pants, sunglasses.");
-    return t("wear_cas_mild", "Light layer, comfortable crewneck sweater or denim jacket, everyday sneakers.");
+    // Casual default
+    if (isFreezing) return t("wear_cas_freezing", "Heavy insulated puffer parka, chunky knit beanie, warm scarf & winter boots.");
+    if (isRainy) return t("wear_cas_rain", "Rain-slicker jacket, water-resistant footwear & portable umbrella.");
+    if (isWarm) return t("wear_cas_warm", "Relaxed cotton t-shirt, comfortable linen shorts, UV sunglasses & slide sandals.");
+    return t("wear_cas_mild", "Comfortable cotton hoodie or zip sweatshirt, classic denim & daily sneakers.");
   })();
 
-  // 24-hour forecast
-  const now = new Date();
-  const currentHourStr = now.toISOString().slice(0, 13);
-  let startIdx = w.hourly.findIndex((h) => h.time.startsWith(currentHourStr));
-  if (startIdx === -1) startIdx = 0;
-  const displayHours = w.hourly.slice(startIdx, startIdx + 24);
-
-  // Sunrise/sunset calculations
-  const riseMinutes = w.sun?.sunrise ? parseInt(w.sun.sunrise.slice(11, 13), 10) * 60 + parseInt(w.sun.sunrise.slice(14, 16), 10) : 360;
-  const setMinutes = w.sun?.sunset ? parseInt(w.sun.sunset.slice(11, 13), 10) * 60 + parseInt(w.sun.sunset.slice(14, 16), 10) : 1080;
-
-  function isHourDaytime(timeStr: string): number {
-    const hr = parseInt(timeStr.slice(11, 13), 10);
-    const min = parseInt(timeStr.slice(14, 16), 10) || 0;
-    const totalMin = hr * 60 + min;
-    return totalMin >= riseMinutes && totalMin < setMinutes ? 1 : 0;
-  }
-
   const activeBg = customPhoto || heroBg;
+  const isCustomActive = Boolean(customPhoto);
+
+  const displayHours = w.hourly.slice(0, 24);
+
+  // Helper for hourly icon day/night state
+  const isHourDaytime = (isoTime: string) => {
+    if (!w.daily?.[0]?.sunrise || !w.daily?.[0]?.sunset) return true;
+    const hourDate = new Date(isoTime);
+    const sunriseDate = new Date(w.daily[0].sunrise);
+    const sunsetDate = new Date(w.daily[0].sunset);
+    return hourDate >= sunriseDate && hourDate < sunsetDate;
+  };
+
   const bgStyle = activeBg.startsWith("linear-gradient")
     ? { background: activeBg }
     : {
@@ -308,137 +304,139 @@ export function WeatherView({
 
         <div className="relative z-10 p-5 flex flex-col justify-between min-h-[190px]">
           {/* Top row: City Name & Favorite */}
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-2xl font-bold tracking-tight text-white drop-shadow-md">
                   {w.place.name}
-                  {w.place.country ? `, ${w.place.country}` : ""}
                 </h2>
                 <button
                   type="button"
                   onClick={onToggleFav}
-                  title={isFav ? "Remove favorite" : "Add favorite"}
                   aria-label={isFav ? "Remove favorite" : "Add favorite"}
-                  className="text-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+                  className="p-1 rounded-full text-white hover:text-amber-300 transition-colors focus:outline-hidden"
                 >
-                  {isFav ? "⭐" : "☆"}
+                  <span className="text-lg leading-none">{isFav ? "★" : "☆"}</span>
                 </button>
               </div>
 
-              <p className="text-xs text-white/80 drop-shadow-sm flex items-center gap-1.5 mt-0.5">
-                <span>{localizedDesc}</span>
-                <span>•</span>
-                <span>{t("feels_like", "Feels like")} {Math.round(w.current.feels)}°{tempSymbol}</span>
-              </p>
+              {w.place.country && (
+                <p className="text-xs text-white/80 font-medium">
+                  {w.place.country}
+                </p>
+              )}
             </div>
 
-            {/* Refresh Pill */}
-            <button
-              onClick={onRefresh}
-              disabled={refreshing}
-              className="group flex items-center gap-1.5 rounded-full bg-black/40 backdrop-blur-md px-3 py-1 text-xs border border-white/15 hover:bg-white/20 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-              title={t("refresh", "Refresh forecast")}
-            >
-              <span className={`inline-block text-xs transition-transform duration-500 ${refreshing ? "animate-spin" : "group-hover:rotate-180"}`}>
-                🔄
-              </span>
-              <span className="text-[11px] font-medium tracking-wide">
-                {refreshing ? "..." : formatTimeAgo(w.fetchedAt)}
-              </span>
-            </button>
+            {/* Badges / Refresh */}
+            <div className="flex items-center gap-1.5">
+              {isGenerating ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2.5 py-1 text-[11px] font-medium text-white/90 border border-white/10">
+                  <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse" />
+                  {t("matching_art", "Matching art…")}
+                </span>
+              ) : isCustomActive ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2.5 py-1 text-[11px] font-medium text-white/90 border border-white/15">
+                  🎨 {t("ai_scene", "AI custom scene")}
+                </span>
+              ) : isAiGenerated ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2.5 py-1 text-[11px] font-medium text-white/90 border border-white/15">
+                  ✨ {t("vibrant_atmosphere", "Vibrant atmosphere")}
+                </span>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={refreshing}
+                title={t("refresh", "Refresh forecast")}
+                className="p-1.5 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-md text-white/90 transition border border-white/10 disabled:opacity-50"
+              >
+                <span className={`inline-block text-xs ${refreshing ? "animate-spin" : ""}`}>
+                  🔄
+                </span>
+              </button>
+            </div>
           </div>
 
-          {/* Bottom row: Temperature & Weather Icon */}
+          {/* Middle/Bottom row: Temp, Icon, Condition */}
           <div className="flex items-end justify-between mt-6">
             <div>
               <div className="flex items-baseline">
-                <span className="text-6xl sm:text-7xl font-extrabold tracking-tight drop-shadow-lg">
+                <span className="text-5xl font-extrabold tracking-tighter drop-shadow-md text-white">
                   {Math.round(w.current.temp)}
                 </span>
-                <span className="text-2xl sm:text-3xl font-light text-white/90 drop-shadow-md ml-1">
+                <span className="text-2xl font-light ml-0.5 text-white/90 drop-shadow-md">
                   {tempSymbol}
                 </span>
               </div>
-              <p className="text-xs text-white/80 mt-1 drop-shadow-sm font-medium">
-                H: {highTemp}°{tempSymbol} • L: {lowTemp}°{tempSymbol}
-              </p>
+
+              <div className="text-xs text-white/85 font-medium mt-1 flex items-center gap-2">
+                <span>{localizedDesc}</span>
+                <span>•</span>
+                <span>
+                  H: {highTemp}° L: {lowTemp}°
+                </span>
+              </div>
             </div>
 
-            <div className="flex flex-col items-end">
-              <div className="relative">
-                <WeatherIcon
-                  wmoCode={w.current.code}
-                  isDay={w.current.is_day ?? 1}
-                  className="h-16 w-16 drop-shadow-md"
-                />
-              </div>
-
-              {/* Status Badge */}
-              <div className="mt-1 flex items-center gap-1 text-[10px] text-white/80">
-                {isGenerating ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2 py-0.5 border border-white/10">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping" />
-                    {t("matching_art", "Matching art…")}
-                  </span>
-                ) : activeBg && !activeBg.startsWith("linear-gradient") ? (
-                  <button
-                    type="button"
-                    onClick={onOpenGallery}
-                    className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2 py-0.5 border border-white/15 hover:bg-white/15 transition-colors cursor-pointer"
-                  >
-                    <span>✨</span>
-                    <span>{t("ai_scene", "AI custom scene")}</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={onOpenGallery}
-                    className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2 py-0.5 border border-white/10 hover:bg-white/15 transition-colors cursor-pointer"
-                  >
-                    <span>🎨</span>
-                    <span>{t("vibrant_atmosphere", "Vibrant atmosphere")}</span>
-                  </button>
-                )}
-              </div>
+            {/* Weather condition icon */}
+            <div className="flex flex-col items-center">
+              <WeatherIcon
+                wmoCode={w.current.code}
+                isDay={w.current.is_day ?? 1}
+                className="h-16 w-16 drop-shadow-md"
+              />
+              <span className="text-[10px] text-white/70 font-mono mt-1">
+                {formatTimeAgo(w.fetchedAt)}
+              </span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 3. WHAT TO WEAR ADVICE */}
-      <section className="mt-4 rounded-2xl border border-border bg-card p-4 shadow-sm text-card-foreground">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
+      {/* 3. WHAT TO WEAR TODAY */}
+      <section className="mt-4 rounded-2xl border border-border bg-card p-4 shadow-sm transition-all">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span className="text-xl">👕</span>
-            <div>
-              <h3 className="font-semibold text-sm leading-none">{t("what_to_wear", "What to Wear Today")}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                {t("tailored_for", "Tailored for")} {localizedDesc} & {Math.round(w.current.temp)}°{tempSymbol}
-              </p>
-            </div>
+            <span className="text-lg">👔</span>
+            <h3 className="font-semibold text-xs tracking-wider uppercase text-muted-foreground">
+              {t("what_to_wear", "What to Wear Today")}
+            </h3>
           </div>
 
-          <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-0.5 text-xs">
-            {(["casual", "business", "sport"] as const).map((mode) => (
+          <div className="inline-flex rounded-lg border border-border bg-muted p-0.5 text-xs">
+            {(["casual", "business", "sport"] as const).map((style) => (
               <button
-                key={mode}
-                onClick={() => setWearStyle(mode)}
-                className={`rounded-md px-2.5 py-1 capitalize font-medium transition-colors cursor-pointer ${
-                  wearStyle === mode
-                    ? "bg-card text-foreground shadow-xs"
+                key={style}
+                type="button"
+                onClick={() => setWearStyle(style)}
+                className={`px-2 py-0.5 rounded-md font-medium capitalize transition-all ${
+                  wearStyle === style
+                    ? "bg-background text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {t(mode, mode)}
+                {t(style, style)}
               </button>
             ))}
           </div>
         </div>
 
-        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          {tailoredAdvice}
-        </p>
+        <div className="rounded-xl border border-border/70 bg-muted/40 p-3">
+          <div className="flex items-start gap-2.5">
+            <span className="text-base mt-0.5">
+              {wearStyle === "business" ? "💼" : wearStyle === "sport" ? "🏃" : "👟"}
+            </span>
+            <div>
+              <p className="text-xs font-medium text-foreground leading-relaxed">
+                {tailoredAdvice}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {t("tailored_for", "Tailored for")} {w.place.name} • {Math.round(w.current.temp)}{tempSymbol} ({localizedDesc})
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* 4. KEY METRICS GRID */}
