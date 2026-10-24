@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import type { WeatherUnit } from "@/lib/weather";
-import { loadUnitPref, saveUnitPref } from "@/lib/weather";
+import { saveUnitPref } from "@/lib/weather";
 
 const SKY_PREF_KEY = "weather:sky-pref";
 const FONT_SIZE_KEY = "weather:font-size-pref";
@@ -54,6 +54,7 @@ export function AppMenu({
   const [open, setOpen] = useState(false);
   const [skyPref, setSkyPref] = useState("auto");
   const [fontSize, setFontSize] = useState("normal");
+  const [currentLang, setCurrentLang] = useState(i18n.language || "en");
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -64,6 +65,16 @@ export function AppMenu({
       if (savedFont) setFontSize(savedFont);
     } catch {}
   }, []);
+
+  useEffect(() => {
+    const handleLanguageChanged = (lng: string) => {
+      setCurrentLang(lng);
+    };
+    i18n.on("languageChanged", handleLanguageChanged);
+    return () => {
+      i18n.off("languageChanged", handleLanguageChanged);
+    };
+  }, [i18n]);
 
   const handleSkyChange = (val: string) => {
     setSkyPref(val);
@@ -82,11 +93,15 @@ export function AppMenu({
     } catch {}
   };
 
-  const handleLangChange = (code: string) => {
-    i18n.changeLanguage(code);
+  const handleLangChange = async (code: string) => {
     try {
+      await i18n.changeLanguage(code);
+      setCurrentLang(code);
       localStorage.setItem("weather:lang", code);
-    } catch {}
+      localStorage.setItem("app_language", code);
+    } catch (e) {
+      console.error("Language switch error:", e);
+    }
   };
 
   useEffect(() => {
@@ -197,21 +212,28 @@ export function AppMenu({
               {t("language")}
             </h4>
             <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
-              {LANGUAGES.map((lang) => (
-                <button
-                  key={lang.code}
-                  type="button"
-                  onClick={() => handleLangChange(lang.code)}
-                  className={`flex items-center gap-1.5 py-1.5 px-2 rounded-lg text-xs text-left border transition ${
-                    i18n.language === lang.code
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-muted hover:bg-muted/80 text-foreground border-border"
-                  }`}
-                >
-                  <span>{lang.flag}</span>
-                  <span className="truncate">{lang.label}</span>
-                </button>
-              ))}
+              {LANGUAGES.map((lang) => {
+                const isActive =
+                  currentLang === lang.code ||
+                  i18n.language === lang.code ||
+                  i18n.language?.startsWith(lang.code + "-");
+
+                return (
+                  <button
+                    key={lang.code}
+                    type="button"
+                    onClick={() => handleLangChange(lang.code)}
+                    className={`flex items-center gap-1.5 py-1.5 px-2 rounded-lg text-xs text-left border transition ${
+                      isActive
+                        ? "bg-primary text-primary-foreground border-primary font-medium"
+                        : "bg-muted hover:bg-muted/80 text-foreground border-border"
+                    }`}
+                  >
+                    <span>{lang.flag}</span>
+                    <span className="truncate">{lang.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
