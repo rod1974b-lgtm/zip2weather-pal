@@ -9,6 +9,8 @@ interface AiCustomSceneDialogProps {
   onImageGenerated: (imageUrl: string, city: string) => void;
 }
 
+const STORAGE_SAVED_KEY = "weather:custom-art-saved";
+
 const PRESET_IDEAS = [
   "Golden sunset glow with warm reflections",
   "Moody mist rolling over the historic bridge",
@@ -45,14 +47,29 @@ export function AiCustomSceneDialog({
         body: JSON.stringify({
           city: city.trim(),
           userPrompt: prompt.trim(),
+          prompt: prompt.trim(),
           weatherDesc,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Failed to generate image");
+      if (!res.ok || data.error || !data.imageUrl) {
+        throw new Error(data?.error || "Failed to generate image");
       }
+
+      // Automatically store in the user's saved art gallery collection
+      try {
+        const raw = localStorage.getItem(STORAGE_SAVED_KEY);
+        const existing = raw ? JSON.parse(raw) : [];
+        const newArt = {
+          id: Date.now().toString(),
+          url: data.imageUrl,
+          label: `${city.trim()} — ${prompt.trim()}`,
+          date: new Date().toLocaleDateString(),
+        };
+        const updated = [newArt, ...existing.filter((item: any) => item.url !== data.imageUrl).slice(0, 19)];
+        localStorage.setItem(STORAGE_SAVED_KEY, JSON.stringify(updated));
+      } catch {}
 
       onImageGenerated(data.imageUrl, city.trim());
       onClose();
@@ -64,7 +81,7 @@ export function AiCustomSceneDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="relative w-full max-w-md rounded-2xl border border-white/20 bg-slate-900/95 p-6 text-white shadow-2xl backdrop-blur-xl">
         <button
           type="button"
