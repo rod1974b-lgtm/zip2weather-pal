@@ -18,14 +18,17 @@ export interface TickerAlertItem {
   textParams?: Record<string, string | number>;
 }
 
-function formatTimeAgo(timestamp: number | null | undefined): string {
-  if (!timestamp || isNaN(timestamp)) return "Just now";
+function formatTimeAgo(
+  timestamp: number | null | undefined,
+  t: (k: string, f?: string) => string
+): string {
+  if (!timestamp || isNaN(timestamp)) return t("time_just_now", "Just now");
   const diffSec = Math.floor((Date.now() - timestamp) / 1000);
-  if (diffSec < 60) return "Just now";
+  if (diffSec < 60) return t("time_just_now", "Just now");
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffMin < 60) return `${diffMin}${t("time_min_ago", "m ago")}`;
   const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
+  if (diffHr < 24) return `${diffHr}${t("time_hr_ago", "h ago")}`;
   return new Date(timestamp).toLocaleDateString();
 }
 
@@ -95,7 +98,7 @@ export function WeatherView({
 }: WeatherViewProps) {
   const { t, i18n } = useTranslation();
   const currentInfo = wmoToIconCode(w.current.code, w.current.is_day ?? 1, w.place.name, w.current.aqi);
-  const localizedDesc = getConditionLabel(w.current.code, t);
+  const localizedDesc = getConditionLabel(w.current.code, t as any);
   const windUnit = w.unit === "imperial" ? "mph" : "km/h";
   const tempSymbol = w.unit === "imperial" ? "°F" : "°C";
 
@@ -208,10 +211,12 @@ export function WeatherView({
 
   // Helper for hourly icon day/night state
   const isHourDaytime = (isoTime: string) => {
-    if (!w.daily?.[0]?.sunrise || !w.daily?.[0]?.sunset) return true;
+    const sunriseStr = (w.daily?.[0] as any)?.sunrise;
+    const sunsetStr = (w.daily?.[0] as any)?.sunset;
+    if (!sunriseStr || !sunsetStr) return true;
     const hourDate = new Date(isoTime);
-    const sunriseDate = new Date(w.daily[0].sunrise);
-    const sunsetDate = new Date(w.daily[0].sunset);
+    const sunriseDate = new Date(sunriseStr);
+    const sunsetDate = new Date(sunsetStr);
     return hourDate >= sunriseDate && hourDate < sunsetDate;
   };
 
@@ -254,8 +259,8 @@ export function WeatherView({
                     if (alert.textKey) {
                       if (alert.textKey === "alert_rain_onset_text" && alert.textParams) {
                         displayText = t("alert_rain_onset_text", {
-                          time: alert.textParams.time,
-                          prob: alert.textParams.prob,
+                          time: alert.textParams["time"],
+                          prob: alert.textParams["prob"],
                           defaultValue: alert.text,
                         });
                       } else {
@@ -264,12 +269,12 @@ export function WeatherView({
                     }
 
                     return (
-                      <span key={idx} className="inline-flex items-center gap-1.5 shrink-0">
-                        <span>{alert.icon}</span>
-                        <strong className="font-semibold underline decoration-dotted underline-offset-2">
-                          {displayTag}:
-                        </strong>
-                        <span>{displayText}</span>
+                      <span key={idx} className="inline-flex items-center gap-2">
+                        <span className="font-semibold text-xs opacity-90">{alert.icon}</span>
+                        <span className="font-bold underline decoration-dotted decoration-1 underline-offset-2">
+                          {displayTag}
+                        </span>
+                        <span className="opacity-95 font-medium">{displayText}</span>
                       </span>
                     );
                   })}
@@ -278,71 +283,87 @@ export function WeatherView({
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-xs text-emerald-700 dark:text-emerald-300">
-            <span className="flex items-center gap-2">
-              <span className="text-base">🌿</span>
-              <span className="font-semibold uppercase tracking-wider text-[11px]">
+          <div className="relative overflow-hidden rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300 backdrop-blur-md shadow-xs">
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 flex items-center gap-1 font-semibold text-[11px] uppercase tracking-wider">
+                <span className="relative flex h-2 w-2">
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
                 {t("all_clear", "ALL CLEAR")}
               </span>
-              <span className="opacity-80 hidden sm:inline">
-                • {t("all_clear_sub", "No severe weather watches active in this region")}
+              <span className="opacity-90 truncate">
+                {t("all_clear_sub", "No severe weather watches active in this region")}
               </span>
-            </span>
-            <span className="text-[10px] opacity-75 font-mono">
-              {new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-            </span>
+            </div>
           </div>
         )}
       </section>
 
-      {/* 2. HERO CARD */}
+      {/* 2. HERO WEATHER CARD */}
       <section
         style={bgStyle}
-        className="relative mt-4 overflow-hidden rounded-2xl bg-slate-900 min-h-[190px] border border-white/10 shadow-lg text-white transition-all duration-700"
+        className="relative overflow-hidden rounded-3xl p-6 text-white shadow-xl min-h-[260px] flex flex-col justify-between transition-all duration-700 bg-cover bg-center"
       >
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/25 z-0" />
+        {/* Soft dark overlay for contrast */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-black/75 pointer-events-none" />
 
-        <div className="relative z-10 p-5 flex flex-col justify-between min-h-[190px]">
-          {/* Top row: City Name & Favorite */}
-          <div className="flex items-start justify-between">
+        <div className="relative z-10 flex flex-col justify-between h-full flex-1">
+          {/* Top row: City, Country, Badges & Actions */}
+          <div className="flex items-start justify-between gap-2">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-bold tracking-tight text-white drop-shadow-md">
+                <h2 className="text-2xl font-bold tracking-tight drop-shadow-md text-white">
                   {w.place.name}
                 </h2>
                 <button
                   type="button"
                   onClick={onToggleFav}
-                  aria-label={isFav ? "Remove favorite" : "Add favorite"}
-                  className="p-1 rounded-full text-white hover:text-amber-300 transition-colors focus:outline-hidden"
+                  title={isFav ? t("remove_fav", "Remove favorite") : t("add_fav", "Add favorite")}
+                  className="text-lg transition hover:scale-110 active:scale-95"
                 >
-                  <span className="text-lg leading-none">{isFav ? "★" : "☆"}</span>
+                  {isFav ? "⭐" : "☆"}
                 </button>
               </div>
+              <p className="text-xs text-white/80 font-medium tracking-wide">
+                {w.place.country}
+              </p>
 
-              {w.place.country && (
-                <p className="text-xs text-white/80 font-medium">
-                  {w.place.country}
-                </p>
-              )}
+              {/* Status / Art badge */}
+              <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                {isCustomActive ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/80 backdrop-blur-md text-white border border-emerald-400/40">
+                    🖼️ {t("gallery_active_badge", "Active Art")}
+                  </span>
+                ) : isGenerating ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-black/40 backdrop-blur-md text-white/90 border border-white/20">
+                    <span className="animate-spin text-[10px]">✨</span>
+                    {t("matching_art", "Matching art…")}
+                  </span>
+                ) : isAiGenerated ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/80 backdrop-blur-md text-white border border-amber-300/40">
+                    ✨ {t("ai_scene", "AI Watercolor")}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-black/40 backdrop-blur-md text-white/85 border border-white/15">
+                    🎨 {t("vibrant_atmosphere", "Vibrant atmosphere")}
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* Badges / Refresh */}
+            {/* Top Right: Gallery / Art Modal Trigger & Refresh */}
             <div className="flex items-center gap-1.5">
-              {isGenerating ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2.5 py-1 text-[11px] font-medium text-white/90 border border-white/10">
-                  <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse" />
-                  {t("matching_art", "Matching art…")}
-                </span>
-              ) : isCustomActive ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2.5 py-1 text-[11px] font-medium text-white/90 border border-white/15">
-                  🎨 {t("ai_scene", "AI custom scene")}
-                </span>
-              ) : isAiGenerated ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md px-2.5 py-1 text-[11px] font-medium text-white/90 border border-white/15">
-                  ✨ {t("vibrant_atmosphere", "Vibrant atmosphere")}
-                </span>
-              ) : null}
+              {onOpenGallery && (
+                <button
+                  type="button"
+                  onClick={onOpenGallery}
+                  title={t("gallery_title", "Art Gallery")}
+                  className="px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-white text-xs font-medium transition border border-white/25 flex items-center gap-1"
+                >
+                  <span>🎨</span>
+                  <span className="hidden sm:inline">{t("art", "Art")}</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -374,12 +395,12 @@ export function WeatherView({
                 <span>{localizedDesc}</span>
                 <span>•</span>
                 <span>
-                  H: {highTemp}° L: {lowTemp}°
+                  {t("high_short", "H")}: {highTemp}° {t("low_short", "L")}: {lowTemp}°
                 </span>
               </div>
             </div>
 
-            {/* Weather condition icon */}
+            {/* Weather condition icon & Timestamp */}
             <div className="flex flex-col items-center">
               <WeatherIcon
                 wmoCode={w.current.code}
@@ -387,7 +408,7 @@ export function WeatherView({
                 className="h-16 w-16 drop-shadow-md"
               />
               <span className="text-[10px] text-white/70 font-mono mt-1">
-                {formatTimeAgo(w.fetchedAt)}
+                {formatTimeAgo(w.fetchedAt, t as any)}
               </span>
             </div>
           </div>
@@ -476,7 +497,7 @@ export function WeatherView({
             {w.current.uvIndex ?? "—"}
           </p>
           <p className="text-[10px] text-muted-foreground mt-0.5">
-            {getUvLabel(w.current.uvIndex ?? 0, t)}
+            {getUvLabel(w.current.uvIndex ?? 0, t as any)}
           </p>
         </div>
 
@@ -489,7 +510,7 @@ export function WeatherView({
             {w.current.aqi !== undefined ? w.current.aqi : "—"}
           </p>
           <p className="text-[10px] text-muted-foreground mt-0.5">
-            {w.current.aqi !== undefined ? getAqiLabel(w.current.aqi, t) : t("aqi_moderate", "Moderate")}
+            {w.current.aqi !== undefined ? getAqiLabel(w.current.aqi, t as any) : t("aqi_moderate", "Moderate")}
           </p>
         </div>
       </section>
@@ -564,7 +585,7 @@ export function WeatherView({
                     className="h-6 w-6 drop-shadow-xs"
                   />
                   <span className="text-[11px] text-muted-foreground hidden sm:inline w-24 truncate">
-                    {getConditionLabel(day.code, t)}
+                    {getConditionLabel(day.code, t as any)}
                   </span>
                 </div>
 
