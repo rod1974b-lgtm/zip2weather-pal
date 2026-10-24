@@ -14,11 +14,10 @@ export const Route = createFileRoute("/api/generate-watercolor")({
           }
 
           const body = await request.json();
-          const { city, userPrompt, weatherDesc } = body as {
-            city: string;
-            userPrompt: string;
-            weatherDesc?: string;
-          };
+          const city = body?.city || "";
+          // Accept both userPrompt and prompt keys to prevent 400 Bad Request
+          const userPrompt = body?.userPrompt || body?.prompt || "";
+          const weatherDesc = body?.weatherDesc || "";
 
           if (!city || !userPrompt) {
             return Response.json(
@@ -27,7 +26,7 @@ export const Route = createFileRoute("/api/generate-watercolor")({
             );
           }
 
-          // Prompt engineering tailored for luminous, atmospheric watercolor
+          // Refined artistic prompt for rich watercolor styling
           const enhancedPrompt = [
             `Vibrant artistic watercolor painting of landmark scenery in ${city}.`,
             weatherDesc ? `Weather mood: ${weatherDesc}.` : "",
