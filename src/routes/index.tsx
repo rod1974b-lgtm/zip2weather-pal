@@ -14,6 +14,7 @@ import {
   saveFavorites,
   isSamePlace,
   isFavorite,
+  skyKey,
 } from "@/lib/weather";
 import { WeatherView, type TickerAlertItem } from "@/components/WeatherView";
 import { AppMenu } from "@/components/AppMenu";
@@ -295,11 +296,29 @@ function Index() {
   const [showAiGallery, setShowAiGallery] = useState(false);
   const [activeCustomBg, setActiveCustomBg] = useState<string | null>(null);
 
+  // Sky theme state: manual override or auto
+  const [skyPref, setSkyPref] = useState<string>(() => {
+    if (typeof window === "undefined") return "auto";
+    try {
+      return localStorage.getItem("weather:sky-pref") || "auto";
+    } catch {
+      return "auto";
+    }
+  });
+
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Initialize preferences, font size, and background
   useEffect(() => {
     setUnit(loadUnitPref());
     setFavorites(loadFavorites());
+
+    try {
+      const savedFont = localStorage.getItem("weather:font-size-pref");
+      if (savedFont === "large") document.documentElement.style.fontSize = "115%";
+      else if (savedFont === "xlarge") document.documentElement.style.fontSize = "130%";
+      else document.documentElement.style.fontSize = "100%";
+    } catch {}
 
     const savedPlace = localStorage.getItem("weather:last-place");
     let initialPlace = DEFAULT_PLACE;
@@ -319,6 +338,40 @@ function Index() {
       window.removeEventListener("offline", handleOffline);
     };
   }, []);
+
+  // Listen for live sky background changes dispatched by AppMenu
+  useEffect(() => {
+    const handleSkyChange = (e: Event) => {
+      const custom = e as CustomEvent<string>;
+      if (custom.detail) {
+        setSkyPref(custom.detail);
+      }
+    };
+    window.addEventListener("weather:sky-change", handleSkyChange);
+    return () => window.removeEventListener("weather:sky-change", handleSkyChange);
+  }, []);
+
+  // Compute active sky class (manual selection or weather-derived)
+  const activeSky =
+    skyPref !== "auto"
+      ? skyPref
+      : weather
+      ? skyKey(weather.current.code, weather.current.isDay)
+      : "default";
+
+  // Sync dark mode class according to sky gradient
+  useEffect(() => {
+    const isDarkSky =
+      activeSky === "clear-night" ||
+      activeSky === "cloudy-night" ||
+      activeSky === "storm";
+
+    if (isDarkSky) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [activeSky]);
 
   useEffect(() => {
     if (!weather?.place?.name) return;
@@ -340,7 +393,7 @@ function Index() {
         localStorage.setItem("weather:last-place", JSON.stringify(place));
       } catch {}
 
-      // Fetch disasters in parallel
+      // Fetch alerts in parallel
       Promise.all([
         fetchLiveEarthquakes(place.lat, place.lon),
         fetchLiveRiverFlood(place.lat, place.lon),
@@ -474,7 +527,7 @@ function Index() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors">
+    <div className={`min-h-screen sky sky-${activeSky} text-foreground transition-colors`}>
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
