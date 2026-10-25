@@ -6,11 +6,15 @@
 export const LANDMARK_WATERCOLORS: Record<string, string[]> = {
   // Thailand & Southeast Asia
   ratchaburi: [
-    "https://images.unsplash.com/photo-1528181304800-259b08848526?auto=format&fit=crop&w=800&q=75", // Rice paddies & countryside
-    "https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=800&q=75", // Traditional riverside temple
-    "https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?auto=format&fit=crop&w=800&q=75", // Tropical limestone karst
+    "/backgrounds/vibrant/ratchaburi_haze.jpg", // Atmospheric Ratchaburi Art
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/%E0%B9%80%E0%B8%97%E0%B8%B7%E0%B8%AD%E0%B8%81%E0%B9%80%E0%B8%82%E0%B8%B2%E0%B8%87%E0%B8%B9_%E0%B8%AD.%E0%B9%80%E0%B8%A1%E0%B8%B7%E0%B8%AD%E0%B8%87_%E0%B8%88.%E0%B8%A3%E0%B8%B2%E0%B8%8A%E0%B8%9A%E0%B8%B8%E0%B8%A3%E0%B8%B5_%2811%29.jpg/1280px-%E0%B9%80%E0%B8%97%E0%B8%B7%E0%B8%AD%E0%B8%81%E0%B9%80%E0%B8%82%E0%B8%B2%E0%B8%87%E0%B8%B9_%E0%B8%AD.%E0%B9%80%E0%B8%A1%E0%B8%B7%E0%B8%AD%E0%B8%87_%E0%B8%88.%E0%B8%A3%E0%B8%B2%E0%B8%8A%E0%B8%9A%E0%B8%B8%E0%B8%A3%E0%B8%B5_%2811%29.jpg", // Khao Ngu Stone Park (เขางู)
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Understanding_the_%22floating_market%22_%2815801439261%29.jpg/1280px-Understanding_the_%22floating_market%22_%2815801439261%29.jpg", // Damnoen Saduak Floating Market (ตลาดน้ำดำเนินสะดวก)
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/NationalMuseumRatchaburi1.JPG/1280px-NationalMuseumRatchaburi1.JPG", // Ratchaburi National Museum
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Kaengsommaew_02.jpg/1280px-Kaengsommaew_02.jpg", // Suan Phueng (สวนผึ้ง)
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/From_Kean_Chandra_Hill_to_Ratchaburi_Downtown_-_panoramio.jpg/1280px-From_Kean_Chandra_Hill_to_Ratchaburi_Downtown_-_panoramio.jpg", // Khao Kaen Chan Viewpoint
   ],
   bangkok: [
+    "/backgrounds/vibrant/bangkok_sunny.jpg",
     "https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=800&q=75", // Wat Arun & Chao Phraya
     "https://images.unsplash.com/photo-1563492065599-3580f77520f2?auto=format&fit=crop&w=800&q=75", // Grand Palace golden stupa
     "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=800&q=75", // Skyline & river
@@ -54,6 +58,7 @@ export const LANDMARK_WATERCOLORS: Record<string, string[]> = {
     "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=800&q=75", // Tokyo Tower sunset
   ],
   kyoto: [
+    "/backgrounds/vibrant/kyoto_sunny.jpg",
     "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=800&q=75",
     "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=800&q=75",
   ],
@@ -112,7 +117,8 @@ export const LANDMARK_WATERCOLORS: Record<string, string[]> = {
     "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=75",
   ],
   skopje: [
-    "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=800&q=75", // Stone Bridge
+    "/backgrounds/vibrant/rain_skopje.jpg",
+    "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=800&q=75",
     "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=75",
   ],
 
@@ -147,11 +153,32 @@ export const LANDMARK_WATERCOLORS: Record<string, string[]> = {
   ],
 };
 
+// Friendly titles for prominent landmarks
+export const LANDMARK_TITLES: Record<string, string> = {
+  "/backgrounds/vibrant/ratchaburi_haze.jpg": "Ratchaburi Atmospheric Watercolor",
+  "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/%E0%B9%80%E0%B8%97%E0%B8%B7%E0%B8%AD%E0%B8%81%E0%B9%80%E0%B8%82%E0%B8%B2%E0%B8%87%E0%B8%B9_%E0%B8%AD.%E0%B9%80%E0%B8%A1%E0%B8%B7%E0%B8%AD%E0%B8%87_%E0%B8%88.%E0%B8%A3%E0%B8%B2%E0%B8%8A%E0%B8%9A%E0%B8%B8%E0%B8%A3%E0%B8%B5_%2811%29.jpg/1280px-%E0%B9%80%E0%B8%97%E0%B8%B7%E0%B8%AD%E0%B8%81%E0%B9%80%E0%B8%82%E0%B8%B2%E0%B8%87%E0%B8%B9_%E0%B8%AD.%E0%B9%80%E0%B8%A1%E0%B8%B7%E0%B8%AD%E0%B8%87_%E0%B8%88.%E0%B8%A3%E0%B8%B2%E0%B8%8A%E0%B8%9A%E0%B8%B8%E0%B8%A3%E0%B8%B5_%2811%29.jpg":
+    "Khao Ngu Stone Park (เขางู)",
+  "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Understanding_the_%22floating_market%22_%2815801439261%29.jpg/1280px-Understanding_the_%22floating_market%22_%2815801439261%29.jpg":
+    "Damnoen Saduak Floating Market (ดำเนินสะดวก)",
+  "https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/NationalMuseumRatchaburi1.JPG/1280px-NationalMuseumRatchaburi1.JPG":
+    "Ratchaburi National Museum (พิพิธภัณฑสถานแห่งชาติ)",
+  "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Kaengsommaew_02.jpg/1280px-Kaengsommaew_02.jpg":
+    "Suan Phueng Nature Garden (สวนผึ้ง)",
+  "https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/From_Kean_Chandra_Hill_to_Ratchaburi_Downtown_-_panoramio.jpg/1280px-From_Kean_Chandra_Hill_to_Ratchaburi_Downtown_-_panoramio.jpg":
+    "Khao Kaen Chan Viewpoint (เขาก่นจันทน์)",
+  "/backgrounds/vibrant/bangkok_sunny.jpg": "Bangkok — Sunny Skyline",
+  "/backgrounds/vibrant/kyoto_sunny.jpg": "Kyoto — Traditional Gardens",
+  "/backgrounds/vibrant/rain_skopje.jpg": "Skopje — Rainy Stone Bridge",
+  "/backgrounds/vibrant/snow_swiss.jpg": "Swiss Alps — Snow Vista",
+  "/backgrounds/vibrant/storm.jpg": "Dramatic Atmospheric Storm",
+};
+
 // ============================================================================
 // 2. WEATHER CONDITION ARTWORKS
 // ============================================================================
 export const WEATHER_WATERCOLORS: Record<string, string[]> = {
   thunderstorm: [
+    "/backgrounds/vibrant/storm.jpg",
     "https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=800&q=75",
     "https://images.unsplash.com/photo-1511289081-d06dda19034d?auto=format&fit=crop&w=800&q=75",
   ],
@@ -160,6 +187,7 @@ export const WEATHER_WATERCOLORS: Record<string, string[]> = {
     "https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?auto=format&fit=crop&w=800&q=75",
   ],
   snow: [
+    "/backgrounds/vibrant/snow_swiss.jpg",
     "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=800&q=75",
     "https://images.unsplash.com/photo-1483921020237-2ff51e8e4b22?auto=format&fit=crop&w=800&q=75",
   ],
@@ -178,7 +206,7 @@ export const WEATHER_WATERCOLORS: Record<string, string[]> = {
 };
 
 // Regional townscape fallback
-function getRegionalArtwork(city: string, country?: string): string[] {
+export function getRegionalArtwork(city: string, country?: string): string[] {
   const text = `${city} ${country || ""}`.toLowerCase();
 
   if (/thailand|vietnam|laos|cambodia|indonesia|malaysia|philippines|myanmar|siam/.test(text)) {
@@ -296,7 +324,6 @@ export async function scanWikipediaLandmarks(
   } catch {}
 
   try {
-    // 1. Geosearch around coordinates (within 15km)
     const geoUrl = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gsradius=15000&gscoord=${lat}|${lon}&gslimit=15&format=json&origin=*`;
     const geoRes = await fetch(geoUrl, { signal: AbortSignal.timeout(5000) });
     if (!geoRes.ok) return [];
@@ -304,7 +331,6 @@ export async function scanWikipediaLandmarks(
     const pages = geoData?.query?.geosearch;
     if (!Array.isArray(pages) || pages.length === 0) return [];
 
-    // Filter & rank landmarks
     const positiveWords =
       /wat|temple|palace|cathedral|church|basilica|castle|fort|tower|bridge|monument|museum|park|sanctuary|pagoda|shrine|ruins|historical|waterfall|mountain|peak|viewpoint|plaza|square/i;
     const negativeWords =
@@ -321,7 +347,6 @@ export async function scanWikipediaLandmarks(
 
     if (ranked.length === 0) return [];
 
-    // 2. Fetch page image thumbnails for top candidates (800px width)
     const titles = ranked.map((p: { title: string }) => encodeURIComponent(p.title)).join("|");
     const imgUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${titles}&prop=pageimages&pithumbsize=800&format=json&origin=*`;
     const imgRes = await fetch(imgUrl, { signal: AbortSignal.timeout(5000) });
@@ -345,9 +370,7 @@ export async function scanWikipediaLandmarks(
       } catch {}
       return imageUrls;
     }
-  } catch {
-    // Graceful fallback on network glitch or timeout
-  }
+  } catch {}
 
   return [];
 }
@@ -439,7 +462,7 @@ export function getAllAvailableArtworks(
 
   const list: string[] = [];
 
-  // 1. Check curated catalog matches
+  // 1. Check curated catalog matches (Authentic city landmarks first)
   for (const [name, urls] of Object.entries(LANDMARK_WATERCOLORS)) {
     if (cityKey.includes(name)) {
       list.push(...urls);
@@ -478,7 +501,7 @@ export function getAllAvailableArtworks(
   // 4. Regional townscape artworks
   list.push(...getRegionalArtwork(cityName, country));
 
-  // Deduplicate
+  // Deduplicate preserving priority order
   return Array.from(new Set(list));
 }
 
@@ -519,13 +542,13 @@ export async function getCityWeatherBackground(
 ): Promise<BackgroundResult> {
   const fallbackGradient = getInstantBackground(weatherCode);
 
-  // 1. Check if user set their own photo
+  // 1. Check if user uploaded their own photo
   const userPhoto = getSavedUserPhoto(city);
   if (userPhoto) {
     return { initialBg: userPhoto, isAi: true };
   }
 
-  // 2. Check if user previously cycled to a specific art choice
+  // 2. Check if user previously chose a specific art piece
   const savedArtChoice = getSavedCustomArtChoice(city);
   if (savedArtChoice) {
     preloadImage(savedArtChoice, 6000).then((ok) => {
