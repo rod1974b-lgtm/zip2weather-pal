@@ -54,7 +54,7 @@ export function AppMenu({
   const [open, setOpen] = useState(false);
   const [skyPref, setSkyPref] = useState("auto");
   const [fontSize, setFontSize] = useState("normal");
-  const [currentLang, setCurrentLang] = useState(i18n.language || "en");
+  const currentLang = i18n?.language || "en";
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,16 +65,6 @@ export function AppMenu({
       if (savedFont) setFontSize(savedFont);
     } catch {}
   }, []);
-
-  useEffect(() => {
-    const handleLanguageChanged = (lng: string) => {
-      setCurrentLang(lng);
-    };
-    i18n.on("languageChanged", handleLanguageChanged);
-    return () => {
-      i18n.off("languageChanged", handleLanguageChanged);
-    };
-  }, [i18n]);
 
   const handleSkyChange = (val: string) => {
     setSkyPref(val);
@@ -95,8 +85,9 @@ export function AppMenu({
 
   const handleLangChange = async (code: string) => {
     try {
-      await i18n.changeLanguage(code);
-      setCurrentLang(code);
+      if (typeof i18n?.changeLanguage === "function") {
+        await i18n.changeLanguage(code);
+      }
       localStorage.setItem("weather:lang", code);
       localStorage.setItem("app_language", code);
     } catch (e) {
@@ -215,8 +206,8 @@ export function AppMenu({
               {LANGUAGES.map((lang) => {
                 const isActive =
                   currentLang === lang.code ||
-                  i18n.language === lang.code ||
-                  i18n.language?.startsWith(lang.code + "-");
+                  i18n?.language === lang.code ||
+                  i18n?.language?.startsWith(lang.code + "-");
 
                 return (
                   <button
