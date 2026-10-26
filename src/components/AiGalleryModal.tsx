@@ -19,7 +19,9 @@ interface AiGalleryModalProps {
   weatherDesc?: string;
   activeBackground?: string;
   activeBg?: string | null;
-  onSelectBackground: (url: string) => void;
+  tempC?: number;
+  onSelectBackground?: (url: string) => void;
+  onSelectBg?: (url: string) => void;
 }
 
 interface SavedArtItem {
@@ -111,7 +113,19 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
   if (!isOpen) return null;
 
   const handleSelect = (url: string) => {
-    props.onSelectBackground(url);
+    props.onSelectBackground?.(url);
+    props.onSelectBg?.(url);
+
+    // Save directly to localStorage per-city
+    try {
+      const storageKey = `weather:custom-bg:${activeCity.toLowerCase().trim()}`;
+      if (url) {
+        localStorage.setItem(storageKey, url);
+      } else {
+        localStorage.removeItem(storageKey);
+      }
+    } catch {}
+
     handleClose();
   };
 
@@ -177,9 +191,11 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
         setSavedArts(updated);
         try {
           localStorage.setItem(STORAGE_SAVED_KEY, JSON.stringify(updated));
+          localStorage.setItem(`weather:custom-bg:${activeCity.toLowerCase().trim()}`, result);
         } catch {}
 
-        props.onSelectBackground(result);
+        props.onSelectBackground?.(result);
+        props.onSelectBg?.(result);
         setActiveTab("saved");
       }
     };
@@ -224,9 +240,11 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
       setSavedArts(updated);
       try {
         localStorage.setItem(STORAGE_SAVED_KEY, JSON.stringify(updated));
+        localStorage.setItem(`weather:custom-bg:${activeCity.toLowerCase().trim()}`, data.imageUrl);
       } catch {}
 
-      props.onSelectBackground(data.imageUrl);
+      props.onSelectBackground?.(data.imageUrl);
+      props.onSelectBg?.(data.imageUrl);
       setPrompt("");
       handleClose();
     } catch (err: any) {
@@ -253,7 +271,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
           </div>
           <button
             onClick={handleClose}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition cursor-pointer"
             aria-label="Close"
           >
             ✕
@@ -264,7 +282,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
         <div className="flex border-b border-border bg-muted/40 px-4 gap-2 pt-2 text-xs font-medium">
           <button
             onClick={() => setActiveTab("curated")}
-            className={`pb-2 px-3 border-b-2 transition ${
+            className={`pb-2 px-3 border-b-2 transition cursor-pointer ${
               activeTab === "curated"
                 ? "border-primary text-primary font-bold"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -274,7 +292,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
           </button>
           <button
             onClick={() => setActiveTab("saved")}
-            className={`pb-2 px-3 border-b-2 transition ${
+            className={`pb-2 px-3 border-b-2 transition cursor-pointer ${
               activeTab === "saved"
                 ? "border-primary text-primary font-bold"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -284,7 +302,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
           </button>
           <button
             onClick={() => setActiveTab("generate")}
-            className={`pb-2 px-3 border-b-2 transition ${
+            className={`pb-2 px-3 border-b-2 transition cursor-pointer ${
               activeTab === "generate"
                 ? "border-primary text-primary font-bold"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -306,7 +324,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                 <button
                   type="button"
                   onClick={() => handleSelect("")}
-                  className="text-xs font-medium text-primary hover:underline"
+                  className="text-xs font-medium text-primary hover:underline cursor-pointer"
                 >
                   {t("gallery_reset_art", "Reset to Weather Art")}
                 </button>
@@ -358,7 +376,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                           type="button"
                           onClick={(e) => handleSaveToCollection(art.url, art.title, e)}
                           title={isAlreadySaved ? "Saved" : "Save to my collection"}
-                          className={`absolute top-2 right-2 p-1 rounded-full text-xs transition backdrop-blur-md ${
+                          className={`absolute top-2 right-2 p-1 rounded-full text-xs transition backdrop-blur-md cursor-pointer ${
                             isAlreadySaved
                               ? "bg-amber-500/80 text-white"
                               : "bg-black/40 text-white/80 hover:text-white hover:bg-black/60"
@@ -385,7 +403,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                   <button
                     type="button"
                     onClick={handleUploadClick}
-                    className="px-2.5 py-1 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-medium transition"
+                    className="px-2.5 py-1 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-medium transition cursor-pointer"
                   >
                     📁 {t("gallery_upload", "Upload Photo")}
                   </button>
@@ -400,7 +418,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                     <button
                       type="button"
                       onClick={handleClearSaved}
-                      className="text-xs text-destructive hover:underline"
+                      className="text-xs text-destructive hover:underline cursor-pointer"
                     >
                       {t("clear_all", "Clear All")}
                     </button>
@@ -453,7 +471,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                           type="button"
                           onClick={(e) => handleDeleteSingleSaved(art.id, e)}
                           title="Remove from saved"
-                          className="absolute top-2 right-2 p-1 rounded-full text-xs bg-black/40 text-white/80 hover:text-destructive hover:bg-black/60 transition backdrop-blur-md"
+                          className="absolute top-2 right-2 p-1 rounded-full text-xs bg-black/40 text-white/80 hover:text-destructive hover:bg-black/60 transition backdrop-blur-md cursor-pointer"
                         >
                           ✕
                         </button>
@@ -504,7 +522,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
                       type="button"
                       onClick={() => setPrompt(sug)}
                       disabled={isGenerating}
-                      className="px-2 py-1 rounded-md text-[10px] bg-muted hover:bg-muted/80 text-foreground transition border border-border"
+                      className="px-2 py-1 rounded-md text-[10px] bg-muted hover:bg-muted/80 text-foreground transition border border-border cursor-pointer"
                     >
                       {sug}
                     </button>
@@ -521,7 +539,7 @@ export function AiGalleryModal(props: AiGalleryModalProps) {
               <button
                 type="submit"
                 disabled={!prompt.trim() || isGenerating}
-                className="w-full py-2.5 px-4 rounded-xl bg-primary text-primary-foreground font-semibold text-xs transition disabled:opacity-50 hover:bg-primary/90 flex items-center justify-center gap-2 shadow-sm"
+                className="w-full py-2.5 px-4 rounded-xl bg-primary text-primary-foreground font-semibold text-xs transition disabled:opacity-50 hover:bg-primary/90 flex items-center justify-center gap-2 shadow-sm cursor-pointer"
               >
                 {isGenerating ? (
                   <>
