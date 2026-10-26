@@ -1,5 +1,5 @@
 // src/routes/index.tsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -136,7 +136,6 @@ async function fetchRiverDischargeAlert(lat: number, lon: number): Promise<Ticke
       { signal: AbortSignal.timeout(4000) }
     );
     if (!res.ok) return [];
-    const data = await res.json();
     const daily = data.daily;
     if (!daily || !daily.river_discharge || !daily.river_discharge_mean) return [];
 
@@ -166,7 +165,6 @@ function deriveLocalWeatherAlerts(w: Weather): TickerAlertItem[] {
   const code = w.current.code;
   const wind = w.current.windSpeed;
   const gust = w.current.windGusts ?? wind;
-  const temp = w.current.temp;
   const aqi = w.current.aqi ?? 0;
   const isImperial = w.unit === "imperial";
 
@@ -235,10 +233,10 @@ function Index() {
   // Search input state
   const [q, setQ] = useState("");
   const [suggestions, setSuggestions] = useState<Place[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [, setSearching] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // Modals
+  // Modals & active custom background
   const [showLocDialog, setShowLocDialog] = useState(false);
   const [showAiGallery, setShowAiGallery] = useState(false);
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
@@ -310,6 +308,33 @@ function Index() {
       }
     } catch {}
   }, []);
+
+  // Restore saved artwork for the current city
+  useEffect(() => {
+    if (weather?.place?.name) {
+      try {
+        const saved = localStorage.getItem(`weather:custom-bg:${weather.place.name.toLowerCase().trim()}`);
+        setCustomBgUrl(saved || null);
+      } catch {
+        setCustomBgUrl(null);
+      }
+    }
+  }, [weather?.place?.name]);
+
+  // Handler for custom background selection & persistence
+  const handleSelectCustomBg = (url: string | null) => {
+    setCustomBgUrl(url);
+    if (weather?.place?.name) {
+      try {
+        const key = `weather:custom-bg:${weather.place.name.toLowerCase().trim()}`;
+        if (url) {
+          localStorage.setItem(key, url);
+        } else {
+          localStorage.removeItem(key);
+        }
+      } catch {}
+    }
+  };
 
   // Fetch live weather data whenever place or unit changes
   useEffect(() => {
@@ -598,7 +623,7 @@ function Index() {
             <button
               type="button"
               onClick={handleRefresh}
-              className="mt-3 inline-flex items-center gap-1 rounded-lg bg-destructive px-3 py-1.5 text-xs text-destructive-foreground hover:bg-destructive/90"
+              className="mt-3 inline-flex items-center gap-1 rounded-lg bg-destructive px-3 py-1.5 text-xs text-destructive-foreground hover:bg-destructive/90 cursor-pointer"
             >
               Try Again
             </button>
@@ -613,6 +638,7 @@ function Index() {
             onRefresh={handleRefresh}
             onOpenGallery={() => setShowAiGallery(true)}
             customBg={customBgUrl}
+            onSelectBg={handleSelectCustomBg}
           />
         ) : null}
       </main>
@@ -666,7 +692,9 @@ function Index() {
               ? ((weather.current.temp - 32) * 5) / 9
               : weather.current.temp
           }
-          onSelectBg={(url) => setCustomBgUrl(url)}
+          activeBackground={customBgUrl || undefined}
+          onSelectBackground={handleSelectCustomBg}
+          onSelectBg={handleSelectCustomBg}
         />
       )}
 
