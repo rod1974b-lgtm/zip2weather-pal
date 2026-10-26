@@ -76,6 +76,16 @@ export function AppMenu({
     } catch {}
   }, [i18n?.language]);
 
+  // Keep language in sync if switched via LanguageSelector
+  useEffect(() => {
+    const handleSync = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) setCurrentLang(detail);
+    };
+    window.addEventListener("weather:lang-change", handleSync);
+    return () => window.removeEventListener("weather:lang-change", handleSync);
+  }, []);
+
   const handleSkyChange = (val: string) => {
     setSkyPref(val);
     try {
@@ -107,6 +117,9 @@ export function AppMenu({
       }
       localStorage.setItem("weather:lang", code);
       localStorage.setItem("app_language", code);
+      if (typeof document !== "undefined") {
+        document.documentElement.lang = code;
+      }
       window.dispatchEvent(new CustomEvent("weather:lang-change", { detail: code }));
     } catch (e) {
       console.error("Language switch error:", e);
