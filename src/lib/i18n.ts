@@ -1444,7 +1444,27 @@ const resources = {
   },
 };
 
-const savedLang = typeof window !== "undefined" ? localStorage.getItem("weather:lang") || "en" : "en";
+// Auto-detect browser/phone system language on first visit across all 14 supported locales
+function detectInitialLanguage(): string {
+  if (typeof window === "undefined") return "en";
+  try {
+    const saved = localStorage.getItem("weather:lang") || localStorage.getItem("app_language");
+    if (saved && Object.prototype.hasOwnProperty.call(resources, saved)) {
+      return saved;
+    }
+    const navLangs = navigator.languages || [navigator.language || ""];
+    for (const lang of navLangs) {
+      if (!lang) continue;
+      const code = lang.toLowerCase().split("-")[0];
+      if (code && Object.prototype.hasOwnProperty.call(resources, code)) {
+        return code;
+      }
+    }
+  } catch {}
+  return "en";
+}
+
+const savedLang = detectInitialLanguage();
 
 i18n.use(initReactI18next).init({
   resources,
@@ -1454,5 +1474,9 @@ i18n.use(initReactI18next).init({
     escapeValue: false,
   },
 });
+
+if (typeof document !== "undefined") {
+  document.documentElement.lang = savedLang;
+}
 
 export default i18n;
