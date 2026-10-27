@@ -227,10 +227,11 @@
 .animate-ticker {
   animation: ticker 35s linear infinite;
   will-change: transform;
+}
+
 /* Suppress badge and floating branding */
 .lovable-badge,
 [data-lovable-badge],
 #lovable-badge {
   display: none !important;
 }
-
