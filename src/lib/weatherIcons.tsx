@@ -83,42 +83,45 @@ export function getWeatherIcon(iconCode: string, description?: string): string {
   const desc = (description || "").toLowerCase();
 
   if (code.startsWith("10") && (desc.includes("heavy") || desc.includes("torrential") || desc.includes("downpour"))) {
-    return watercolorIcons["10d_heavy"];
+    return watercolorIcons["10d_heavy"] ?? "/icons/watercolor/10d_heavy_rain.png";
   }
 
   if ((code.startsWith("09") || code.startsWith("10")) && desc.includes("drizzle")) {
-    return code.endsWith("n") ? (watercolorIcons["09n_drizzle"] || watercolorIcons["09d_drizzle"]) : watercolorIcons["09d_drizzle"];
+    const fallback = code.endsWith("n") ? watercolorIcons["09n_drizzle"] : watercolorIcons["09d_drizzle"];
+    return fallback ?? watercolorIcons["09d_drizzle"] ?? "/icons/watercolor/09d_shower_rain.png";
   }
 
   if (code.startsWith("50") || desc.includes("haze") || desc.includes("fog") || desc.includes("mist")) {
-    if (desc.includes("mist")) return code.endsWith("n") ? watercolorIcons["50n_mist"] : watercolorIcons["50d_mist"];
-    if (desc.includes("fog")) return code.endsWith("n") ? watercolorIcons["50n_fog"] : watercolorIcons["50d_fog"];
-    if (desc.includes("haze") || desc.includes("smog") || desc.includes("pm2.5")) return watercolorIcons["50d_haze"];
-    if (desc.includes("dust") || desc.includes("sand")) return watercolorIcons["50d_dust"];
-    if (desc.includes("smoke")) return watercolorIcons["50d_smoke"];
-    if (desc.includes("tornado")) return watercolorIcons["50d_tornado"];
-    if (desc.includes("wind")) return watercolorIcons["50d_wind"];
-    return watercolorIcons["50d"];
+    if (desc.includes("mist")) return (code.endsWith("n") ? watercolorIcons["50n_mist"] : watercolorIcons["50d_mist"]) ?? "/icons/watercolor/50d_mist.png";
+    if (desc.includes("fog")) return (code.endsWith("n") ? watercolorIcons["50n_fog"] : watercolorIcons["50d_fog"]) ?? "/icons/watercolor/50d_fog.png";
+    if (desc.includes("haze") || desc.includes("smog") || desc.includes("pm2.5")) return watercolorIcons["50d_haze"] ?? "/icons/watercolor/50d_haze_ratchaburi.png";
+    if (desc.includes("dust") || desc.includes("sand")) return watercolorIcons["50d_dust"] ?? "/icons/watercolor/50d_dust.png";
+    if (desc.includes("smoke")) return watercolorIcons["50d_smoke"] ?? "/icons/watercolor/50d_smoke.png";
+    if (desc.includes("tornado")) return watercolorIcons["50d_tornado"] ?? "/icons/watercolor/50d_tornado.png";
+    if (desc.includes("wind")) return watercolorIcons["50d_wind"] ?? "/icons/watercolor/50d_wind.png";
+    return watercolorIcons["50d"] ?? "/icons/watercolor/50d_haze_ratchaburi.png";
   }
 
-  if (watercolorIcons[code]) return watercolorIcons[code];
+  const direct = watercolorIcons[code];
+  if (direct) return direct;
 
   const dayCode = code.replace("n", "d");
   const nightCode = code.replace("d", "n");
   return (
-    watercolorIcons[code] ||
-    watercolorIcons[dayCode] ||
-    watercolorIcons[nightCode] ||
-    watercolorIcons["01d"]
+    watercolorIcons[dayCode] ??
+    watercolorIcons[nightCode] ??
+    watercolorIcons["01d"] ??
+    "/icons/watercolor/01d_clear_sky.png"
   );
 }
 
 export function getWeatherIconWithFallback(iconCode: string, description?: string) {
   const url = getWeatherIcon(iconCode, description);
+  const prefix = (iconCode || "").split("_")[0] || "01d";
   const fallback =
     fallbackIcons[iconCode] ||
     fallbackIcons[iconCode.replace("n", "d")] ||
-    fallbackIcons[iconCode.split("_")[0]] ||
+    fallbackIcons[prefix] ||
     "⛅";
   return { url, fallback };
 }
