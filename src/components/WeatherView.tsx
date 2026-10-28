@@ -1,7 +1,7 @@
 // src/components/WeatherView.tsx
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { type Weather } from "@/lib/weather";
+import type { Weather, WeatherUnit } from "@/lib/weather";
 import { WeatherIcon } from "@/lib/weatherIcons";
 import {
   getCityWeatherBackground,
@@ -68,33 +68,45 @@ const TAG_TRANSLATION_MAP: Record<string, string> = {
   "ALL CLEAR": "all_clear",
 };
 
-interface WeatherViewProps {
-  w: Weather;
+export interface WeatherViewProps {
+  w?: Weather;
+  weather?: Weather;
   disasters?: TickerAlertItem[];
-  refreshing: boolean;
-  isFav: boolean;
-  onToggleFav: () => void;
-  onRefresh: () => void;
+  unit?: WeatherUnit;
+  refreshing?: boolean;
+  isFav?: boolean;
+  onToggleFav?: () => void;
+  onRefresh?: () => void;
   onOpenGallery?: () => void;
   customBg?: string | null;
   onSelectBg?: (url: string | null) => void;
 }
 
 export function WeatherView({
-  w,
+  w: propW,
+  weather: propWeather,
   disasters = [],
-  refreshing,
-  isFav,
+  unit: propUnit,
+  refreshing = false,
+  isFav = false,
   onToggleFav,
   onRefresh,
   onOpenGallery,
   customBg,
   onSelectBg,
 }: WeatherViewProps) {
+  const w = propWeather || propW;
   const { t, i18n } = useTranslation();
+
+  if (!w) return null;
+
+  const currentUnit: WeatherUnit = propUnit || w.unit || "metric";
   const localizedDesc = getConditionLabel(w.current.code, t as any);
-  const windUnit = w.unit === "imperial" ? "mph" : "km/h";
-  const tempSymbol = w.unit === "imperial" ? "°F" : "°C";
+  const windUnit = currentUnit === "imperial" ? "mph" : "km/h";
+  const tempSymbol = currentUnit === "imperial" ? "°F" : "°C";
+
+  const rawWind = (w.current as any).wind ?? (w.current as any).windSpeed ?? 0;
+  const rawUv = (w.current as any).uvIndex ?? (w.current as any).uv ?? 0;
 
   // Instant weather gradient fallback
   const [heroBg, setHeroBg] = useState<string>(() => getInstantBackground(w.current.code));
@@ -113,7 +125,7 @@ export function WeatherView({
     return null;
   });
 
-  const tempC = w.unit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
+  const tempC = currentUnit === "imperial" ? ((w.current.temp - 32) * 5) / 9 : w.current.temp;
   const isRainy = w.current.code >= 51 && w.current.code <= 82;
   const isFreezing = tempC <= 5;
   const isWarm = tempC >= 22;
@@ -145,7 +157,7 @@ export function WeatherView({
     if (customBg === undefined) {
       setCustomPhoto(null);
     }
-  }, [w?.place?.name]);
+  }, [w?.place?.name, customBg]);
 
   // Load AI curated or regional artwork
   useEffect(() => {
@@ -154,9 +166,10 @@ export function WeatherView({
     setHeroBg(instantGradient);
     setIsGenerating(true);
 
+    const desc = (w.current as any).desc || "Clear";
     getCityWeatherBackground(
       w.place.name,
-      w.current.desc || "Clear",
+      desc,
       w.current.code,
       w.current.temp,
       (streamingBg) => {
@@ -185,17 +198,13 @@ export function WeatherView({
     return () => {
       cancelled = true;
     };
-  }, [w.place.name, w.current.code, w.current.temp, w.current.desc, w.place.country, w.place.lat, w.place.lon]);
+  }, [w.place.name, w.current.code, w.current.temp, w.place.country, w.place.lat, w.place.lon]);
 
   // Flip directly to the next landmark / watercolor artwork on 1-tap
   const handleNextArt = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const list = getAllAvailableArtworks(
-      w.place.name,
-      w.current.code,
-      w.current.desc || "Clear",
-      w.place.country
-    );
+    const desc = (w.current as any).desc || "Clear";
+    const list = getAllAvailableArtworks(w.place.name, w.current.code, desc, w.place.country);
 
     if (!list || list.length === 0) return;
 
@@ -214,7 +223,10 @@ export function WeatherView({
 
   const isCustomActive = Boolean(customPhoto);
   const activeHeroBg = customPhoto || heroBg;
-  const isImageBg = activeHeroBg.startsWith("http") || activeHeroBg.startsWith("data:") || activeHeroBg.startsWith("/backgrounds");
+  const isImageBg =
+    activeHeroBg.startsWith("http") ||
+    activeHeroBg.startsWith("data:") ||
+    activeHeroBg.startsWith("/backgrounds");
 
   const bgStyle = isImageBg
     ? { backgroundImage: `url(${activeHeroBg})` }
@@ -250,12 +262,7 @@ export function WeatherView({
               </span>
 
               <div className="relative overflow-hidden flex-1 group">
-                <div
-                  className="flex items-center gap-8 whitespace-nowrap will-change-transform group-hover:[animation-play-state:paused]"
-                  style={{
-                    animation: `marquee ${Math.max(25, disasters.length * 15)}s linear infinite`,
-                  }}
-                >
+                <div className="flex items-center gap-8 whitespace-nowrap will-change-transform animate-ticker group-hover:[animation-play-state:paused]">
                   {disasters.map((item, idx) => {
                     const tagKey = item.tagKey || TAG_TRANSLATION_MAP[item.tag] || "";
                     const localizedTag = tagKey ? t(tagKey, item.tag) : item.tag;
@@ -302,7 +309,6 @@ export function WeatherView({
         style={bgStyle}
         className="relative overflow-hidden rounded-3xl p-6 text-white shadow-xl min-h-[260px] flex flex-col justify-between transition-all duration-700 bg-cover bg-center"
       >
-        {/* Soft, light gradient overlay: preserves vivid artwork colors while ensuring text readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/45 pointer-events-none" />
 
         <div className="relative z-10 flex flex-col justify-between h-full flex-1">
@@ -313,14 +319,16 @@ export function WeatherView({
                 <h2 className="text-2xl font-bold tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] text-white">
                   {w.place.name}
                 </h2>
-                <button
-                  type="button"
-                  onClick={onToggleFav}
-                  title={isFav ? t("remove_fav", "Remove favorite") : t("add_fav", "Add favorite")}
-                  className="text-lg transition hover:scale-110 active:scale-95 cursor-pointer drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
-                >
-                  {isFav ? "⭐" : "☆"}
-                </button>
+                {onToggleFav && (
+                  <button
+                    type="button"
+                    onClick={onToggleFav}
+                    title={isFav ? t("remove_fav", "Remove favorite") : t("add_fav", "Add favorite")}
+                    className="text-lg transition hover:scale-110 active:scale-95 cursor-pointer drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+                  >
+                    {isFav ? "⭐" : "☆"}
+                  </button>
+                )}
               </div>
               <p className="text-xs text-white font-medium tracking-wide drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
                 {w.place.country}
@@ -374,17 +382,19 @@ export function WeatherView({
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={onRefresh}
-                disabled={refreshing}
-                title={t("refresh", "Refresh forecast")}
-                className="p-1.5 rounded-full bg-black/35 hover:bg-black/50 backdrop-blur-md text-white transition border border-white/20 disabled:opacity-50 cursor-pointer shadow-sm"
-              >
-                <span className={`inline-block text-xs ${refreshing ? "animate-spin" : ""}`}>
-                  🔄
-                </span>
-              </button>
+              {onRefresh && (
+                <button
+                  type="button"
+                  onClick={onRefresh}
+                  disabled={refreshing}
+                  title={t("refresh", "Refresh forecast")}
+                  className="p-1.5 rounded-full bg-black/35 hover:bg-black/50 backdrop-blur-md text-white transition border border-white/20 disabled:opacity-50 cursor-pointer shadow-sm"
+                >
+                  <span className={`inline-block text-xs ${refreshing ? "animate-spin" : ""}`}>
+                    🔄
+                  </span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -472,7 +482,10 @@ export function WeatherView({
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
           {w.hourly?.slice(0, 12).map((item, idx) => {
             const date = new Date(item.time);
-            const hourStr = idx === 0 ? t("now", "Now") : date.toLocaleTimeString(i18n.language || "en", { hour: "numeric" });
+            const hourStr =
+              idx === 0
+                ? t("now", "Now")
+                : date.toLocaleTimeString(i18n.language || "en", { hour: "numeric" });
             const itemDesc = getConditionLabel(item.code, t as any);
 
             return (
@@ -552,7 +565,7 @@ export function WeatherView({
             <span>💨</span> {t("wind", "Wind")}
           </div>
           <div className="text-lg font-bold mt-1 text-foreground">
-            {Math.round(w.current.windSpeed)} <span className="text-xs font-normal">{windUnit}</span>
+            {Math.round(rawWind)} <span className="text-xs font-normal">{windUnit}</span>
           </div>
         </div>
 
@@ -562,10 +575,10 @@ export function WeatherView({
             <span>☀️</span> {t("uv_index", "UV Index")}
           </div>
           <div className="text-lg font-bold mt-1 text-foreground">
-            {w.current.uv != null ? Math.round(w.current.uv) : "--"}
-            {w.current.uv != null && (
+            {rawUv != null ? Math.round(rawUv) : "--"}
+            {rawUv != null && (
               <span className="text-xs font-normal text-muted-foreground ml-1">
-                ({getUvLabel(w.current.uv, t as any)})
+                ({getUvLabel(rawUv, t as any)})
               </span>
             )}
           </div>
