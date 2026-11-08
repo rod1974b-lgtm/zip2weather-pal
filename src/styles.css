@@ -138,11 +138,7 @@
     color: var(--color-foreground);
   }
 
-  /*
-   * Sky-inspired page background. The wrapper element carries a .sky-<key>
-   * class that points --sky at a gradient matching the current conditions;
-   * .sky applies it (falling back to the plain background color).
-   */
+  /* Sky-inspired page background */
   .sky {
     background: var(--sky, var(--background));
   }
